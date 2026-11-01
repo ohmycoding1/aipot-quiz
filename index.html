@@ -234,6 +234,7 @@ function studentView() {
   const token = store("quiz_token");
   if (!token) return studentLogin();
   S.token = token;
+  try { const sv = JSON.parse(store("quiz_drafts_" + token) || "{}"); S.pick = sv.pick || {}; S.draft = sv.draft || {}; } catch (e) { S.pick = {}; S.draft = {}; }
   app.innerHTML = '<div class="wrap"><div class="card empty muted">불러오는 중…</div></div>';
   loadStudent(true);
   onLive(function () { loadStudent(false); });
@@ -293,7 +294,8 @@ function renderStudent() {
   const qs = d.questions.slice().sort(function (a, b) { return a.session - b.session || a.qno - b.qno; });
   const live = qs.filter(function (q) { return q.status === "open" || q.status === "locked"; });
   const done = qs.filter(function (q) { return q.status === "revealed"; });
-  const todoList = live.filter(function (q) { return q.status === "open" && q.response == null; });
+  prefill(live);
+  const todoList = live.filter(function (q) { return q.status === "open" && !localAns(q); });
   const by = {};
   for (const q of done) (by[q.session] = by[q.session] || []).push(q);
   const sessions = Object.keys(by).map(Number).sort(function (a, b) { return b - a; });
@@ -322,14 +324,26 @@ function renderStudent() {
         '<p class="muted small">화면을 켜 둔 채로 기다려 주세요.<br>지난 문제는 아래 \'지난 시험\'에서 볼 수 있어요.</p></div>';
     } else {
       const ss = live.map(function (q) { return q.session; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
-      const sent = live.filter(function (q) { return q.response != null; }).length;
-      const locked = live.every(function (q) { return q.status === "locked"; });
+      const open = live.filter(function (q) { return q.status === "open"; });
+      const written = open.filter(function (q) { return !!localAns(q); }).length;
+      const dirty = open.filter(function (q) { return localAns(q) && localAns(q) !== (q.response == null ? "" : String(q.response).trim()); }).length;
+      const submitted = live.filter(function (q) { return q.response != null; }).length;
+      const locked = !open.length;
       html += '<div class="prog"><div class="row" style="gap:8px"><b>' + ss.join(" · ") + "차시</b>" +
-        '<span class="muted small grow">' + (locked ? "제출 마감 · 정답 공개를 기다려요" : "제출 " + sent + " / " + live.length) + "</span>" +
-        (todoList.length ? '<button class="btn sm orange" id="jump">안 푼 문제 ' + todoList.length + "개 ↓</button>" : "") + "</div>" +
-        '<div class="bar"><i style="width:' + Math.round(sent * 100 / live.length) + '%"></i></div></div>';
-      if (!todoList.length && !locked) html += '<div class="note ok">모두 제출했어요! 선생님이 정답을 공개하면 점수가 반영돼요.</div>';
+        '<span class="muted small grow">' + (locked ? "제출 마감 · 정답 공개를 기다려요" : "작성 " + written + " / " + open.length) + "</span>" +
+        (!locked && written < open.length ? '<button class="btn sm orange" id="jump">안 푼 문제 ' + (open.length - written) + "개 ↓</button>" :
+          !locked && (dirty || submitted < open.length) ? '<button class="btn sm orange" id="jump">답안 제출하러 가기 ↓</button>' : "") + "</div>" +
+        '<div class="bar"><i style="width:' + Math.round((locked ? submitted : written) * 100 / live.length) + '%"></i></div></div>';
+      if (locked) html += '<div class="note ex">제출 ' + submitted + " / " + live.length + "문제 · 선생님이 정답을 공개하면 결과가 나와요.</div>";
+      else html += '<p class="muted small" style="margin:-4px 2px 0">답을 모두 고른 뒤 맨 아래 <b>답안 제출</b>을 눌러요. 마감 전까지는 다시 고치고 또 제출할 수 있어요.</p>';
       live.forEach(function (q, k) { html += studentCard(q, k + 1, live.length); });
+      if (!locked) {
+        const allSent = submitted >= open.length && !dirty;
+        html += '<div class="card stack" id="subbar" style="text-align:center">' +
+          '<div class="small muted">' + (allSent ? "모두 제출했어요. 고치려면 답을 바꾸고 다시 제출하세요." : "작성 " + written + " / " + open.length + (dirty && submitted ? " · 바뀐 답 " + dirty + "개" : "")) + "</div>" +
+          '<button class="btn orange" id="submitall" style="width:100%"' + (written && !S.sending && !allSent ? "" : " disabled") + ">" +
+          (S.sending ? "제출 중…" : allSent ? "제출 완료 ✓" : submitted ? "수정한 답안 다시 제출" : "답안 제출 (" + written + "/" + open.length + ")") + "</button></div>";
+      }
     }
   } else if (S.tab === "past") {
     if (S.past && !by[S.past]) S.past = null;
@@ -391,36 +405,36 @@ function renderStudent() {
   const jb = document.getElementById("jump");
   if (jb) jb.onclick = function () { scrollToNext(); };
   for (const b of app.querySelectorAll("[data-pick]")) {
-    b.onclick = function () {
-      const qid = b.dataset.q;
-      S.pick[qid] = b.dataset.pick; renderStudent();
-      const sb3 = app.querySelector('[data-submit="' + qid + '"]');
-      if (sb3) {
-        const r = sb3.getBoundingClientRect(), limit = window.innerHeight - 110;
-        if (r.bottom > limit) window.scrollBy({ top: r.bottom - limit, behavior: "smooth" });
-      }
-    };
+    b.onclick = function () { S.pick[b.dataset.q] = b.dataset.pick; saveDrafts(); renderStudent(); };
   }
   for (const inp of app.querySelectorAll("[data-draft]")) {
-    inp.oninput = function () {
-      S.draft[inp.dataset.draft] = inp.value;
-      const sb2 = app.querySelector('[data-submit="' + inp.dataset.draft + '"]');
-      if (sb2) { sb2.disabled = !inp.value.trim(); sb2.textContent = inp.value.trim() ? "제출하기" : "답을 입력해 주세요"; }
-    };
-    inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); submitAnswer(inp.dataset.draft); } };
+    inp.oninput = function () { S.draft[inp.dataset.draft] = inp.value; saveDrafts(); };
+    inp.onchange = function () { renderStudent(); };
+    inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } };
   }
-  for (const b of app.querySelectorAll("[data-submit]")) {
-    b.onclick = function () { submitAnswer(b.dataset.submit); };
+  const sa = document.getElementById("submitall");
+  if (sa) sa.onclick = function () { submitAll(false); };
+  for (const b of app.querySelectorAll("[data-confirm]")) {
+    b.onclick = function () { const m = document.getElementById("cfm"); if (m) m.remove(); if (b.dataset.confirm === "go") submitAll(true); else scrollToNext(); };
   }
   if (focusId) { const el = document.getElementById(focusId); if (el) el.focus({ preventScroll: true }); }
   if (S.tab === "rank") loadBoard(document.getElementById("lbcard"), null, 5, d.me, sc);
   if (S.jump) { S.jump = false; setTimeout(scrollToNext, 350); }
 }
 
+function saveDrafts() { store("quiz_drafts_" + S.token, JSON.stringify({ pick: S.pick, draft: S.draft })); }
+function localAns(q) { return q.kind === "mc" ? S.pick[q.id] : (S.draft[q.id] || "").trim(); }
+function prefill(qs) {
+  for (const q of qs) {
+    if (q.response == null) continue;
+    if (q.kind === "mc" && S.pick[q.id] == null) S.pick[q.id] = q.response;
+    if (q.kind === "short" && S.draft[q.id] == null) S.draft[q.id] = q.response;
+  }
+}
 function scrollToNext() {
   const q = S.data.questions.slice().sort(function (a, b) { return a.session - b.session || a.qno - b.qno; })
-    .find(function (x) { return x.status === "open" && x.response == null; });
-  if (!q) return;
+    .find(function (x) { return x.status === "open" && !localAns(x); });
+  if (!q) { const bar = document.getElementById("subbar"); if (bar) bar.scrollIntoView({ behavior: "smooth", block: "end" }); return; }
   const el = document.getElementById("q-" + q.id);
   if (!el) return;
   const top = el.getBoundingClientRect().top + window.scrollY - 70;
@@ -431,13 +445,16 @@ function scrollToNext() {
 
 function studentCard(q, no, total) {
   const answered = q.response != null;
-  const canAnswer = q.status === "open" && !answered;
-  const head = '<div class="row"><span class="qno">' + no + '</span><span class="q-label grow">' + (total ? no + " / " + total : "") + "</span>" +
-    (q.status === "revealed" ? (answered ? (q.is_correct ? '<span class="pill p-revealed">정답 +' + q.points + "</span>" : '<span class="pill" style="background:var(--redT);color:var(--red)">오답</span>') : '<span class="pill p-ready">미제출</span>') : statusPill(q.status)) + "</div>";
-  if ((q.status === "open" || q.status === "locked") && answered) {
-    return '<div class="card done" id="q-' + q.id + '">' + head + '<div class="q-body">' + esc(q.body) + "</div>" +
-      '<div class="note wait">제출 완료 · 내 답: ' + esc(myText(q, q.response)) + "</div></div>";
-  }
+  const canAnswer = q.status === "open";
+  const mine = canAnswer ? localAns(q) : "";
+  const changed = canAnswer && mine && mine !== (answered ? String(q.response).trim() : "");
+  let pill;
+  if (q.status === "revealed") pill = answered ? (q.is_correct ? '<span class="pill p-revealed">정답 +' + q.points + "</span>" : '<span class="pill" style="background:var(--redT);color:var(--red)">오답</span>') : '<span class="pill p-ready">미제출</span>';
+  else if (q.status === "locked") pill = answered ? '<span class="pill p-locked">제출됨</span>' : '<span class="pill p-ready">미제출</span>';
+  else if (!mine) pill = '<span class="pill p-open">안 품</span>';
+  else if (changed) pill = '<span class="pill p-open">' + (answered ? "수정됨 · 제출 필요" : "작성함 · 제출 전") + "</span>";
+  else pill = '<span class="pill p-revealed">제출됨</span>';
+  const head = '<div class="row"><span class="qno">' + no + '</span><span class="q-label grow">' + (total ? no + " / " + total : "") + "</span>" + pill + "</div>";
   let h = '<div class="card" id="q-' + q.id + '">' + head + '<div class="q-body">' + esc(q.body) + "</div>";
   if (q.kind === "mc") {
     h += '<div class="choices">';
@@ -448,6 +465,8 @@ function studentCard(q, no, total) {
       if (q.status === "revealed") {
         if (q.answer && q.answer.indexOf(v) >= 0) cls += " ok";
         else if (q.response === v) cls += " no";
+      } else if (q.status === "locked") {
+        pressed = q.response === v;
       } else {
         pressed = S.pick[q.id] === v;
       }
@@ -457,13 +476,13 @@ function studentCard(q, no, total) {
     h += "</div>";
   } else if (canAnswer) {
     h += '<input class="input" id="in-' + q.id + '" data-draft="' + q.id + '" placeholder="답을 입력하세요 (철자 주의)" value="' + esc(S.draft[q.id] || "") +
-      '" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">';
+      '" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">';
+  } else if (q.status === "locked" && answered) {
+    h += '<div class="note wait">내 답: ' + esc(q.response) + "</div>";
   }
   if (canAnswer) {
-    const ready = q.kind === "mc" ? !!S.pick[q.id] : !!(S.draft[q.id] || "").trim();
-    h += '<div style="margin-top:12px"><button class="btn orange" style="width:100%" data-submit="' + q.id + '"' + (ready && !S.busy[q.id] ? "" : " disabled") + ">" +
-      (S.busy[q.id] ? "제출 중…" : ready ? "제출하기" : (q.kind === "mc" ? "보기를 골라 주세요" : "답을 입력해 주세요")) + "</button></div>";
-  } else if (q.status === "locked") {
+    // 제출은 맨 아래 '답안 제출' 버튼으로 한 번에
+  } else if (q.status === "locked" && !answered) {
     h += '<div class="note ex" style="margin-top:12px">제출 시간이 끝났어요. 정답 공개를 기다려 주세요.</div>';
   } else if (q.status === "revealed") {
     if (!answered) h += '<div class="note ex" style="margin-top:12px">제출하지 않았어요 · 정답: <b>' + esc(answerText(q)) + "</b></div>";
@@ -474,15 +493,29 @@ function studentCard(q, no, total) {
   return h + "</div>";
 }
 
-async function submitAnswer(qid) {
-  const q = S.data.questions.find(function (x) { return String(x.id) === String(qid); });
-  if (!q) return;
-  const val = q.kind === "mc" ? S.pick[qid] : (S.draft[qid] || "").trim();
-  if (!val) { toast("답을 먼저 골라 주세요"); return; }
-  S.busy[qid] = true; renderStudent();
-  const r = await rpc("student_submit", { p_token: S.token, p_qid: Number(qid), p_response: val });
-  S.busy[qid] = false;
-  if (r.error) toast(r.error); else { toast("제출했어요!"); S.jump = true; }
+async function submitAll(force) {
+  const open = S.data.questions.filter(function (q) { return q.status === "open"; });
+  const ans = {};
+  let blank = 0;
+  for (const q of open) { const v = localAns(q); if (v) ans[q.id] = v; else blank++; }
+  if (!Object.keys(ans).length) { toast("먼저 답을 골라 주세요"); return; }
+  if (blank && !force) {
+    const m = document.createElement("div");
+    m.className = "modal"; m.id = "cfm";
+    m.innerHTML = '<div class="card stack" style="max-width:360px;text-align:center"><h2>안 푼 문제가 ' + blank + "개 있어요</h2>" +
+      '<p class="muted" style="margin:0">지금 제출해도 마감 전까지는 나머지를 풀어서 다시 제출할 수 있어요.</p>' +
+      '<button class="btn" data-confirm="back">안 푼 문제 풀기</button><button class="btn ghost" data-confirm="go">이대로 제출</button></div>';
+    document.body.appendChild(m);
+    for (const b of m.querySelectorAll("[data-confirm]")) {
+      b.onclick = function () { m.remove(); if (b.dataset.confirm === "go") submitAll(true); else scrollToNext(); };
+    }
+    return;
+  }
+  S.sending = true; renderStudent();
+  const r = await rpc("student_submit_all", { p_token: S.token, p_answers: ans });
+  S.sending = false;
+  if (r.error) toast(r.error === "LOGIN" ? "다시 로그인해 주세요" : r.error);
+  else toast(r.saved + "문제 제출했어요! 마감 전까지 수정할 수 있어요");
   loadStudent(true);
 }
 
