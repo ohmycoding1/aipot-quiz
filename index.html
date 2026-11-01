@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI-POT 확인퀴즈</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+/* 레이아웃: 연한 회색 바탕 위 흰 카드. 학생=모바일 1열, 선생님=넓은 1열, 화면=프로젝터 2열 */
+:root {
+  --bg: #F3F4F6; --card: #FFFFFF; --ink: #1F2937; --sub: #6B7280; --line: #E5E7EB;
+  --navy: #1E3A8A; --navyT: #E0E7FF; --orange: #EA580C; --orangeT: #FFEDD5;
+  --teal: #0F766E; --tealT: #CCFBF1; --red: #DC2626; --redT: #FEE2E2;
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+.wrap { max-width: 640px; margin: 0 auto; padding: 16px max(16px, env(safe-area-inset-left)) 48px max(16px, env(safe-area-inset-right)); }
+.wide { max-width: 1100px; }
+.card { background: var(--card); border-radius: 16px; padding: 20px; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+h2 { font-size: 18px; margin: 0; }
+.muted { color: var(--sub); }
+.small { font-size: 14px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.p-ready { background: var(--line); color: var(--sub); }
+.p-open { background: var(--orangeT); color: var(--orange); }
+.p-locked { background: var(--navyT); color: var(--navy); }
+.p-revealed { background: var(--tealT); color: var(--teal); }
+.btn { border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 700; background: var(--navy); color: #fff; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.ghost { background: var(--card); color: var(--navy); box-shadow: inset 0 0 0 1.5px var(--navyT); }
+.btn.orange { background: var(--orange); }
+.btn.teal { background: var(--teal); }
+.btn.red { background: var(--red); }
+.btn.sm { padding: 7px 12px; border-radius: 10px; font-size: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 700; color: var(--sub); }
+.input { width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--card); }
+.input:focus { border-color: var(--navy); outline: none; }
+.err { color: var(--red); font-weight: 600; min-height: 1.5em; }
+.top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.brand { font-weight: 800; color: var(--navy); }
+.tabs { display: flex; gap: 6px; background: var(--line); padding: 4px; border-radius: 12px; }
+.tabs button { flex: 1; border: 0; background: transparent; padding: 9px 12px; border-radius: 9px; font-weight: 700; color: var(--sub); }
+.tabs button[aria-selected="true"] { background: var(--card); color: var(--navy); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.q-label { font-size: 13px; font-weight: 800; color: var(--navy); letter-spacing: .02em; }
+.q-body { font-size: 18px; font-weight: 700; margin: 6px 0 14px; word-break: keep-all; }
+.choices { display: grid; gap: 8px; }
+.choice { display: flex; gap: 12px; align-items: center; text-align: left; border: 1.5px solid var(--line); background: var(--card); border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+.choice .n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); font-weight: 800; color: var(--navy); }
+.choice[aria-pressed="true"] { border-color: var(--navy); background: var(--navyT); }
+.choice[aria-pressed="true"] .n { background: var(--navy); color: #fff; }
+.choice.ok { border-color: var(--teal); background: var(--tealT); }
+.choice.ok .n { background: var(--teal); color: #fff; }
+.choice.no { border-color: var(--red); background: var(--redT); }
+.note { border-radius: 12px; padding: 12px 14px; font-weight: 600; }
+.note.wait { background: var(--navyT); color: var(--navy); }
+.note.ok { background: var(--tealT); color: var(--teal); }
+.note.no { background: var(--redT); color: var(--red); }
+.note.ex { background: var(--bg); color: var(--ink); font-weight: 500; }
+.empty { text-align: center; padding: 36px 20px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--orange); display: inline-block; animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.75); } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+.score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.score b { display: block; font-size: 26px; color: var(--navy); font-variant-numeric: tabular-nums; }
+.score span { font-size: 13px; color: var(--sub); font-weight: 700; }
+.sec-title { font-size: 15px; font-weight: 800; color: var(--sub); margin: 8px 2px 0; }
+.lb { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.lb td, .lb th { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.lb th { font-size: 13px; color: var(--sub); }
+.lb tr.me td { background: var(--orangeT); font-weight: 700; }
+.medal { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg); font-weight: 800; }
+.m1 { background: #FDE68A; } .m2 { background: #E5E7EB; } .m3 { background: #FED7AA; }
+.bar { height: 10px; border-radius: 6px; background: var(--line); overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--navy); }
+.bar.ok > i { background: var(--teal); }
+.grp { display: grid; grid-template-columns: minmax(0, 1fr) 46px 120px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.grp:last-child { border-bottom: 0; }
+.tbl-wrap { overflow-x: auto; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 0; border-radius: 10px; padding: 8px 12px; background: var(--card); font-weight: 700; color: var(--sub); }
+.chip[aria-pressed="true"] { background: var(--navy); color: #fff; }
+.modal { position: fixed; inset: 0; background: rgba(17,24,39,.45); display: grid; place-items: center; padding: 16px; z-index: 20; }
+.modal .card { width: min(640px, 100%); max-height: 92vh; overflow: auto; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 12px; font-weight: 600; z-index: 30; }
+/* 프로젝터 화면 */
+.screen { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; padding: 24px; min-height: 100vh; }
+.screen .q-body { font-size: clamp(26px, 3vw, 44px); line-height: 1.35; }
+.screen .choice { font-size: clamp(20px, 2vw, 30px); padding: 16px 20px; }
+.screen .choice .n { width: 44px; height: 44px; }
+.big-count { font-size: 64px; font-weight: 800; color: var(--orange); line-height: 1; font-variant-numeric: tabular-nums; }
+.qrbox { display: grid; place-items: center; background: #fff; border-radius: 16px; padding: 16px; }
+.qrbox img, .qrbox canvas { width: 100% !important; height: auto !important; max-width: 280px; }
+.url { font-weight: 800; color: var(--navy); word-break: break-all; text-align: center; }
+@media (max-width: 900px) { .screen { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const CFG = window.QUIZ_CONFIG || {};
+const app = document.getElementById("app");
+const SESSIONS = CFG.SESSIONS || 10;
+const BASE_URL = location.origin + location.pathname;
+let sb = null;
+let timer = null;
+let channel = null;
+
+// ---------- 공통 도우미 ----------
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function store(k, v) {
+  try {
+    if (v === undefined) return localStorage.getItem(k);
+    if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v);
+  } catch (e) { return null; }
+}
+function sstore(k, v) {
+  try {
+    if (v === undefined) return sessionStorage.getItem(k);
+    if (v === null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v);
+  } catch (e) { return null; }
+}
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function () { t.remove(); }, 2200);
+}
+async function rpc(name, args) {
+  const res = await sb.rpc(name, args || {});
+  if (res.error) return { error: "서버 연결 오류: " + res.error.message };
+  return res.data || {};
+}
+function stopLoops() {
+  if (timer) { clearInterval(timer); timer = null; }
+  if (channel) { sb.removeChannel(channel); channel = null; }
+}
+function onLive(fn) {
+  channel = sb.channel("live-" + Date.now())
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "live" }, function () { fn(); })
+    .subscribe();
+}
+const STATUS = { ready: "대기", open: "풀이 중", locked: "마감", revealed: "정답 공개" };
+function statusPill(s) { return '<span class="pill p-' + s + '">' + STATUS[s] + "</span>"; }
+function circled(i) { return "①②③④⑤⑥⑦⑧"[i] || (i + 1) + "."; }
+function answerText(q) {
+  if (!q.answer) return "";
+  if (q.kind === "mc") {
+    const parts = [];
+    for (const a of q.answer) {
+      const i = parseInt(a, 10) - 1;
+      parts.push(circled(i) + " " + (q.choices[i] || ""));
+    }
+    return parts.join(", ");
+  }
+  return q.answer[0];
+}
+function myText(q, r) {
+  if (r == null) return "";
+  if (q.kind === "mc") {
+    const i = parseInt(r, 10) - 1;
+    return circled(i) + " " + (q.choices[i] || "");
+  }
+  return r;
+}
+
+// ---------- 라우팅 ----------
+function route() {
+  stopLoops();
+  const h = location.hash.replace("#", "");
+  if (h === "teacher") return teacherView();
+  if (h.indexOf("screen") === 0) return screenView(parseInt(h.split("-")[1], 10) || parseInt(store("quiz_session") || "1", 10));
+  return studentView();
+}
+
+// =====================================================================
+//  학생 화면
+// =====================================================================
+const S = { tab: "quiz", data: null, sig: "", pick: {}, draft: {}, busy: {} };
+
+function studentView() {
+  const token = store("quiz_token");
+  if (!token) return studentLogin();
+  S.token = token;
+  app.innerHTML = '<div class="wrap"><div class="card empty muted">불러오는 중…</div></div>';
+  loadStudent(true);
+  onLive(function () { loadStudent(false); });
+  timer = setInterval(function () { loadStudent(false); }, 5000);
+}
+
+function studentLogin(msg) {
+  app.innerHTML =
+    '<div class="wrap stack" style="padding-top:8vh">' +
+    '<div class="card stack">' +
+    '<div><div class="brand">' + esc(CFG.TITLE || "확인퀴즈") + '</div><h1 style="margin-top:4px">학번으로 시작하기</h1>' +
+    '<p class="muted small" style="margin:6px 0 0">처음 접속할 때 정한 PIN 4자리를 다음 차시에도 그대로 써요.</p></div>' +
+    '<form id="lf" class="stack" novalidate>' +
+    '<div class="field"><label for="sid">학번</label><input class="input" id="sid" inputmode="numeric" autocomplete="username" placeholder="예: 20261234" required></div>' +
+    '<div class="field"><label for="sname">이름</label><input class="input" id="sname" autocomplete="name" placeholder="처음 한 번만 저장돼요"></div>' +
+    '<div class="field"><label for="spin">PIN (숫자 4자리)</label><input class="input" id="spin" inputmode="numeric" maxlength="4" autocomplete="current-password" type="password" placeholder="••••" required></div>' +
+    '<div class="err" id="lerr">' + esc(msg || "") + '</div>' +
+    '<button class="btn" id="lbtn" type="submit">입장하기</button>' +
+    "</form></div>" +
+    '<p class="muted small" style="text-align:center">선생님 화면은 <a href="#teacher">여기</a></p></div>';
+  document.getElementById("lf").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById("lbtn");
+    btn.disabled = true;
+    const r = await rpc("student_login", {
+      p_sid: document.getElementById("sid").value,
+      p_name: document.getElementById("sname").value,
+      p_pin: document.getElementById("spin").value
+    });
+    btn.disabled = false;
+    if (r.error) { document.getElementById("lerr").textContent = r.error; return; }
+    store("quiz_token", r.token);
+    toast(r.new ? r.name + "님, 등록됐어요!" : r.name + "님, 다시 만나요!");
+    studentView();
+  });
+}
+
+async function loadStudent(force) {
+  const r = await rpc("student_state", { p_token: S.token });
+  if (r.error === "LOGIN") { store("quiz_token", null); return studentLogin("다시 로그인해 주세요."); }
+  if (r.error) { if (force) app.innerHTML = '<div class="wrap"><div class="card err">' + esc(r.error) + "</div></div>"; return; }
+  const sig = JSON.stringify(r);
+  if (!force && sig === S.sig) return;
+  S.sig = sig; S.data = r;
+  renderStudent();
+}
+
+function renderStudent() {
+  const d = S.data;
+  const focusId = document.activeElement && document.activeElement.id;
+  const sc = d.score;
+  let html = '<div class="wrap stack">' +
+    '<div class="top"><div class="grow"><div class="brand">' + esc(CFG.TITLE || "확인퀴즈") + "</div>" +
+    '<div class="muted small">' + esc(d.me.name) + " · " + esc(d.me.student_id) + "</div></div>" +
+    '<button class="btn ghost sm" id="logout">나가기</button></div>' +
+    '<div class="card score"><div><b>' + sc.points + '</b><span>내 점수</span></div><div><b>' + sc.correct + '</b><span>맞힌 문제</span></div>' +
+    "<div><b>" + (sc.rank ? sc.rank + '<small style="font-size:15px">/' + sc.total + "</small>" : "-") + "</b><span>순위</span></div></div>" +
+    '<div class="tabs" role="tablist"><button role="tab" data-tab="quiz" aria-selected="' + (S.tab === "quiz") + '">문제</button>' +
+    '<button role="tab" data-tab="rank" aria-selected="' + (S.tab === "rank") + '">순위</button></div>';
+
+  if (S.tab === "quiz") {
+    const live = [];
+    const done = [];
+    const byNo = d.questions.slice().sort(function (a, b) { return a.session - b.session || a.qno - b.qno; });
+    for (const q of byNo) {
+      if (q.status === "open" || q.status === "locked") live.push(q); else done.push(q);
+    }
+    html += '<div class="sec-title">지금 푸는 문제</div>';
+    if (live.length === 0) {
+      html += '<div class="card empty"><span class="dot"></span><h2 style="margin-top:10px">선생님이 문제를 열면 여기에 바로 나타나요</h2>' +
+        '<p class="muted small">화면을 켜 둔 채로 기다려 주세요.</p></div>';
+    }
+    for (const q of live) html += studentCard(q);
+    if (done.length) {
+      html += '<div class="sec-title">결과 보기</div>';
+      for (const q of done) html += studentCard(q);
+    }
+    html += '<p class="muted small" style="text-align:center">점수는 선생님이 정답을 공개하면 반영돼요.</p>';
+  } else {
+    html += '<div class="card" id="lbcard"><div class="muted">순위를 불러오는 중…</div></div>';
+  }
+  html += "</div>";
+  app.innerHTML = html;
+
+  document.getElementById("logout").onclick = function () { store("quiz_token", null); route(); };
+  for (const b of app.querySelectorAll("[data-tab]")) {
+    b.onclick = function () { S.tab = b.dataset.tab; renderStudent(); };
+  }
+  for (const b of app.querySelectorAll("[data-pick]")) {
+    b.onclick = function () { S.pick[b.dataset.q] = b.dataset.pick; renderStudent(); };
+  }
+  for (const inp of app.querySelectorAll("[data-draft]")) {
+    inp.oninput = function () { S.draft[inp.dataset.draft] = inp.value; };
+    inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); submitAnswer(inp.dataset.draft); } };
+  }
+  for (const b of app.querySelectorAll("[data-submit]")) {
+    b.onclick = function () { submitAnswer(b.dataset.submit); };
+  }
+  if (focusId) { const el = document.getElementById(focusId); if (el) el.focus(); }
+  if (S.tab === "rank") loadBoard(document.getElementById("lbcard"), null, 20, d.me);
+}
+
+function studentCard(q) {
+  const answered = q.response != null;
+  let h = '<div class="card"><div class="row"><span class="q-label grow">' + q.session + "차시 · " + esc(q.label) + "</span>" + statusPill(q.status) + "</div>" +
+    '<div class="q-body">' + esc(q.body) + "</div>";
+  const canAnswer = q.status === "open" && !answered;
+  if (q.kind === "mc") {
+    h += '<div class="choices">';
+    for (let i = 0; i < q.choices.length; i++) {
+      const v = String(i + 1);
+      let cls = "choice";
+      let pressed = false;
+      if (q.status === "revealed") {
+        if (q.answer && q.answer.indexOf(v) >= 0) cls += " ok";
+        else if (q.response === v) cls += " no";
+      } else {
+        pressed = answered ? q.response === v : S.pick[q.id] === v;
+      }
+      h += '<button class="' + cls + '" aria-pressed="' + pressed + '"' + (canAnswer ? ' data-q="' + q.id + '" data-pick="' + v + '"' : " disabled") +
+        '><span class="n">' + (i + 1) + "</span><span>" + esc(q.choices[i]) + "</span></button>";
+    }
+    h += "</div>";
+  } else if (canAnswer) {
+    h += '<input class="input" id="in-' + q.id + '" data-draft="' + q.id + '" placeholder="답을 입력하세요 (철자·띄어쓰기 주의)" value="' + esc(S.draft[q.id] || "") + '">';
+  }
+  if (canAnswer) {
+    const ready = q.kind === "mc" ? !!S.pick[q.id] : true;
+    h += '<div style="margin-top:12px"><button class="btn orange" style="width:100%" data-submit="' + q.id + '"' + (ready && !S.busy[q.id] ? "" : " disabled") + ">제출하기</button></div>";
+  } else if (q.status === "open" || q.status === "locked") {
+    if (answered) {
+      h += '<div class="note wait" style="margin-top:12px">제출 완료' + (q.kind === "short" ? " · 내 답: " + esc(q.response) : "") + " · 정답은 선생님이 공개해요</div>";
+    } else {
+      h += '<div class="note ex" style="margin-top:12px">마감된 문제예요.</div>';
+    }
+  } else if (q.status === "revealed") {
+    if (!answered) h += '<div class="note ex" style="margin-top:12px">제출하지 않았어요 · 정답: <b>' + esc(answerText(q)) + "</b></div>";
+    else if (q.is_correct) h += '<div class="note ok" style="margin-top:12px">정답! +' + q.points + "점" + (q.kind === "short" ? " · 내 답: " + esc(q.response) : "") + "</div>";
+    else h += '<div class="note no" style="margin-top:12px">아쉬워요 · 내 답: ' + esc(myText(q, q.response)) + " · 정답: " + esc(answerText(q)) + "</div>";
+    if (q.explanation) h += '<div class="note ex" style="margin-top:8px">' + esc(q.explanation) + "</div>";
+  }
+  return h + "</div>";
+}
+
+async function submitAnswer(qid) {
+  const q = S.data.questions.find(function (x) { return String(x.id) === String(qid); });
+  if (!q) return;
+  const val = q.kind === "mc" ? S.pick[qid] : (S.draft[qid] || "").trim();
+  if (!val) { toast("답을 먼저 골라 주세요"); return; }
+  S.busy[qid] = true; renderStudent();
+  const r = await rpc("student_submit", { p_token: S.token, p_qid: Number(qid), p_response: val });
+  S.busy[qid] = false;
+  if (r.error) toast(r.error); else toast("제출했어요!");
+  loadStudent(true);
+}
+
+async function loadBoard(el, session, limit, me) {
+  const r = await rpc("leaderboard", { p_session: session, p_limit: limit });
+  if (!el) return;
+  if (r.error) { el.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+  if (!r.length) { el.innerHTML = '<div class="muted">아직 공개된 점수가 없어요. 첫 정답 공개를 기다려 주세요.</div>'; return; }
+  let h = '<table class="lb"><thead><tr><th>순위</th><th>이름</th><th>점수</th><th>정답</th></tr></thead><tbody>';
+  for (const p of r) {
+    const mine = me && me.student_id.slice(-4) === p.sid && maskName(me.name) === p.name;
+    h += '<tr class="' + (mine ? "me" : "") + '"><td><span class="medal ' + (p.rank <= 3 ? "m" + p.rank : "") + '">' + p.rank + "</span></td>" +
+      "<td>" + esc(p.name) + ' <span class="muted small">' + esc(p.sid) + "</span></td><td><b>" + p.points + "</b></td><td>" + p.correct + "</td></tr>";
+  }
+  el.innerHTML = h + "</tbody></table>";
+}
+function maskName(n) {
+  if (n.length <= 1) return n;
+  if (n.length === 2) return n[0] + "*";
+  return n[0] + "*".repeat(n.length - 2) + n[n.length - 1];
+}
+
+// =====================================================================
+//  선생님 화면
+// =====================================================================
+const T = { tab: "run", session: parseInt(store("quiz_session") || "1", 10), data: null, sig: "", confirm: null, studs: null };
+
+function teacherView() {
+  const pin = sstore("quiz_tpin");
+  if (!pin) return teacherLogin();
+  T.pin = pin;
+  app.innerHTML = '<div class="wrap wide"><div class="card empty muted">불러오는 중…</div></div>';
+  loadTeacher(true);
+  timer = setInterval(function () { if (T.tab === "run") loadTeacher(false); }, 2500);
+}
+
+function teacherLogin(msg) {
+  app.innerHTML = '<div class="wrap stack" style="padding-top:10vh"><form class="card stack" id="tf" novalidate>' +
+    '<div><div class="brand">선생님 화면</div><h1 style="margin-top:4px">선생님 PIN</h1></div>' +
+    '<input class="input" id="tpin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Supabase SQL에서 정한 PIN">' +
+    '<div class="err" id="terr">' + esc(msg || "") + '</div><button class="btn" type="submit">들어가기</button>' +
+    '<a class="small muted" href="#">← 학생 화면</a></form></div>';
+  document.getElementById("tf").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const pin = document.getElementById("tpin").value;
+    const r = await rpc("teacher_login", { p_pin: pin });
+    if (r.error) { document.getElementById("terr").textContent = r.error; return; }
+    sstore("quiz_tpin", pin);
+    teacherView();
+  });
+}
+
+async function loadTeacher(force) {
+  const r = await rpc("teacher_overview", { p_pin: T.pin, p_session: T.session });
+  if (r.error === "PIN") { sstore("quiz_tpin", null); return teacherLogin("PIN을 다시 입력해 주세요."); }
+  if (r.error) { toast(r.error); return; }
+  const sig = JSON.stringify(r);
+  if (!force && sig === T.sig) return;
+  if (!force && document.querySelector(".modal")) return;
+  T.sig = sig; T.data = r;
+  renderTeacher();
+}
+
+function renderTeacher() {
+  const d = T.data;
+  let h = '<div class="wrap wide stack"><div class="top"><div class="grow"><div class="brand">선생님 화면</div>' +
+    '<div class="muted small">등록 학생 ' + d.students + "명</div></div>" +
+    '<a class="btn ghost sm" href="#screen-' + T.session + '" target="_blank" rel="noopener">프로젝터 화면 열기</a>' +
+    '<button class="btn ghost sm" id="tout">나가기</button></div>' +
+    '<div class="chips">';
+  for (let i = 1; i <= SESSIONS; i++) {
+    const has = d.sessions.indexOf(i) >= 0;
+    h += '<button class="chip" data-sess="' + i + '" aria-pressed="' + (i === T.session) + '">' + i + "차시</button>";
+  }
+  h += '</div><div class="tabs" role="tablist"><button role="tab" data-ttab="run" aria-selected="' + (T.tab === "run") + '">문제 운영</button>' +
+    '<button role="tab" data-ttab="students" aria-selected="' + (T.tab === "students") + '">점수 · 학생</button></div>';
+
+  if (T.tab === "run") {
+    const qs = d.questions;
+    const cnt = function (st) { return qs.filter(function (q) { return q.status === st; }).length; };
+    const readyN = cnt("ready"), openN = cnt("open"), lockN = cnt("locked"), revN = cnt("revealed");
+    const stage = openN ? "풀이 중" : lockN ? "마감" : revN && !readyN ? "정답 공개 완료" : revN ? "일부 공개" : "대기";
+    h += '<div class="card"><div class="row"><b>' + T.session + '차시 문제 ' + qs.length + '개</b><span class="pill p-' + (openN ? "open" : lockN ? "locked" : revN ? "revealed" : "ready") + '">' + stage + '</span>' +
+      '<span class="small muted">대기 ' + readyN + ' · 풀이 중 ' + openN + ' · 마감 ' + lockN + ' · 공개 ' + revN + '</span></div>' +
+      '<div class="row" style="margin-top:12px">' +
+      '<button class="btn orange" id="openall"' + (readyN + lockN ? "" : " disabled") + '>' + T.session + '차시 전체 열기</button>' +
+      '<button class="btn" id="lockall"' + (openN ? "" : " disabled") + '>전체 제출 마감</button>' +
+      '<button class="btn teal" id="revall"' + (openN + lockN ? "" : " disabled") + '>전체 정답 공개</button>' +
+      '<span class="grow"></span>' +
+      (T.confirm === "all"
+        ? '<span class="small err">이 차시 제출 기록이 모두 지워져요.</span><button class="btn red sm" id="resetall">전체 초기화 확인</button><button class="btn ghost sm" data-cancel="1">취소</button>'
+        : '<button class="btn ghost sm" id="resetask"' + (openN + lockN + revN ? "" : " disabled") + '>전체 초기화</button>') +
+      '<button class="btn ghost sm" id="newq">+ 새 문제</button></div></div>';
+    if (!qs.length) h += '<div class="card empty muted">' + T.session + "차시 문제가 아직 없어요. ‘+ 새 문제’로 추가하세요.</div>";
+    for (const q of qs) h += teacherCard(q, d.students);
+  } else {
+    h += '<div class="card" id="studs"><div class="muted">불러오는 중…</div></div>';
+  }
+  app.innerHTML = h + "</div>";
+
+  document.getElementById("tout").onclick = function () { sstore("quiz_tpin", null); route(); };
+  for (const b of app.querySelectorAll("[data-sess]")) {
+    b.onclick = function () { T.session = parseInt(b.dataset.sess, 10); store("quiz_session", String(T.session)); loadTeacher(true); };
+  }
+  for (const b of app.querySelectorAll("[data-ttab]")) {
+    b.onclick = function () { T.tab = b.dataset.ttab; renderTeacher(); };
+  }
+  if (T.tab === "students") return loadStudents();
+  document.getElementById("newq").onclick = function () {
+    const next = T.data.questions.reduce(function (m, q) { return Math.max(m, q.qno); }, 0) + 1;
+    editQuestion({ session: T.session, qno: next, label: "", kind: "mc", body: "", choices: ["", "", "", ""], answer: [], explanation: "", points: 10 });
+  };
+  document.getElementById("openall").onclick = function () { bulk("open"); };
+  document.getElementById("lockall").onclick = function () { bulk("locked"); };
+  document.getElementById("revall").onclick = function () { bulk("revealed"); };
+  const ra = document.getElementById("resetask");
+  if (ra) ra.onclick = function () { T.confirm = "all"; renderTeacher(); };
+  const rs = document.getElementById("resetall");
+  if (rs) rs.onclick = function () { T.confirm = null; bulk("ready"); };
+  for (const b of app.querySelectorAll("[data-set]")) {
+    b.onclick = async function () {
+      const qid = Number(b.dataset.qid);
+      if (b.dataset.set === "ready" && T.confirm !== qid) { T.confirm = qid; renderTeacher(); return; }
+      T.confirm = null;
+      const r = await rpc("teacher_set_status", { p_pin: T.pin, p_qid: qid, p_status: b.dataset.set });
+      if (r.error) toast(r.error);
+      loadTeacher(true);
+    };
+  }
+  for (const b of app.querySelectorAll("[data-cancel]")) b.onclick = function () { T.confirm = null; renderTeacher(); };
+  for (const b of app.querySelectorAll("[data-edit]")) {
+    b.onclick = function () { editQuestion(T.data.questions.find(function (q) { return String(q.id) === b.dataset.edit; })); };
+  }
+  for (const b of app.querySelectorAll("[data-accept]")) {
+    b.onclick = async function () {
+      const r = await rpc("teacher_accept", { p_pin: T.pin, p_qid: Number(b.dataset.qid), p_response: b.dataset.accept, p_ok: b.dataset.ok === "1" });
+      if (r.error) toast(r.error); else toast(b.dataset.ok === "1" ? "정답으로 인정했어요" : "인정을 취소했어요");
+      loadTeacher(true);
+    };
+  }
+}
+
+async function bulk(to) {
+  const r = await rpc("teacher_set_session_status", { p_pin: T.pin, p_session: T.session, p_status: to });
+  if (r.error) toast(r.error === "PIN" ? "PIN을 다시 확인해 주세요" : r.error);
+  else toast({ open: "문제를 모두 열었어요", locked: "제출을 마감했어요", revealed: "정답을 공개했어요", ready: "초기화했어요" }[to]);
+  loadTeacher(true);
+}
+
+function teacherCard(q, total) {
+  const rate = q.submitted ? Math.round(q.correct * 100 / q.submitted) : 0;
+  let h = '<div class="card"><div class="row"><span class="q-label">' + q.qno + ". " + esc(q.label) + "</span>" + statusPill(q.status) +
+    '<span class="grow"></span><span class="small muted">' + (q.kind === "mc" ? "객관식" : "단답형") + " · " + q.points + "점</span></div>" +
+    '<div class="q-body">' + esc(q.body) + "</div>" +
+    '<div class="small muted" style="margin:-6px 0 10px">정답: <b style="color:var(--teal)">' + esc(q.kind === "mc" ? answerText(q) : q.answer.join(" / ")) + "</b></div>";
+
+  if (q.status === "ready") {
+    if (q.kind === "mc") {
+      for (let i = 0; i < q.choices.length; i++) {
+        const ok = q.answer.indexOf(String(i + 1)) >= 0;
+        h += '<div class="grp"><span' + (ok ? ' style="color:var(--teal);font-weight:700"' : "") + '>' + circled(i) + " " + esc(q.choices[i]) + (ok ? " ✓" : "") + "</span></div>";
+      }
+    } else {
+      h += '<div class="small muted">인정 답안: ' + esc(q.answer.join(" / ")) + "</div>";
+    }
+  }
+  if (q.explanation) h += '<div class="note ex" style="margin-top:8px">해설: ' + esc(q.explanation) + "</div>";
+  if (q.status !== "ready") {
+    h += '<div class="row small" style="margin:10px 0 8px"><b>제출 ' + q.submitted + " / " + total + "명</b><span class=\"muted\">정답 " + q.correct + "명 · 정답률 " + rate + "%</span></div>";
+    if (q.kind === "mc") {
+      const counts = q.choices.map(function () { return 0; });
+      for (const g of q.groups) { const i = parseInt(g.response, 10) - 1; if (i >= 0 && i < counts.length) counts[i] += g.n; }
+      for (let i = 0; i < q.choices.length; i++) {
+        const ok = q.answer.indexOf(String(i + 1)) >= 0;
+        const pct = q.submitted ? Math.round(counts[i] * 100 / q.submitted) : 0;
+        h += '<div class="grp"><span>' + circled(i) + " " + esc(q.choices[i]) + '</span><b class="small">' + counts[i] + '</b><div class="bar ' + (ok ? "ok" : "") + '"><i style="width:' + pct + '%"></i></div></div>';
+      }
+    } else {
+      for (const g of q.groups) {
+        h += '<div class="grp"><span>' + esc(g.response) + '</span><b class="small">' + g.n + "명</b>" +
+          '<button class="btn sm ' + (g.ok ? "ghost" : "teal") + '" data-qid="' + q.id + '" data-accept="' + esc(g.response) + '" data-ok="' + (g.ok ? "0" : "1") + '">' +
+          (g.ok ? "인정 취소" : "정답 인정") + "</button></div>";
+      }
+    }
+  }
+  h += '<div class="row" style="margin-top:12px">';
+  h += '<span class="grow"></span><button class="btn ghost sm" data-edit="' + q.id + '">수정</button>';
+  if (q.status !== "ready") {
+    if (T.confirm === q.id) {
+      h += '<span class="small err">제출 기록이 지워져요.</span><button class="btn red sm" data-qid="' + q.id + '" data-set="ready">초기화 확인</button><button class="btn ghost sm" data-cancel="1">취소</button>';
+    } else {
+      h += '<button class="btn ghost sm" data-qid="' + q.id + '" data-set="ready">초기화</button>';
+    }
+  }
+  return h + "</div></div>";
+}
+
+function editQuestion(q) {
+  const m = document.createElement("div");
+  m.className = "modal";
+  const ansStr = q.kind === "mc" ? q.answer.join(",") : q.answer.join(", ");
+  m.innerHTML = '<form class="card stack" id="qf" novalidate><h2>' + (q.id ? "문제 수정" : "새 문제") + "</h2>" +
+    '<div class="grid2"><div class="field"><label for="f-s">차시</label><input class="input" id="f-s" type="number" min="1" value="' + q.session + '"></div>' +
+    '<div class="field"><label for="f-n">번호</label><input class="input" id="f-n" type="number" min="1" value="' + q.qno + '"></div>' +
+    '<div class="field"><label for="f-k">유형</label><select class="input" id="f-k"><option value="mc"' + (q.kind === "mc" ? " selected" : "") + '>객관식</option><option value="short"' + (q.kind === "short" ? " selected" : "") + ">단답형</option></select></div>" +
+    '<div class="field"><label for="f-p">점수</label><input class="input" id="f-p" type="number" min="0" value="' + q.points + '"></div></div>' +
+    '<div class="field"><label for="f-l">이름표 (예: 확인 문제 Q1)</label><input class="input" id="f-l" value="' + esc(q.label) + '"></div>' +
+    '<div class="field"><label for="f-b">문제</label><textarea class="input" id="f-b" rows="3">' + esc(q.body) + "</textarea></div>" +
+    '<div class="field" id="f-cw"><label for="f-c">보기 (한 줄에 하나)</label><textarea class="input" id="f-c" rows="4">' + esc((q.choices || []).join("\n")) + "</textarea></div>" +
+    '<div class="field"><label for="f-a" id="f-al"></label><input class="input" id="f-a" value="' + esc(ansStr) + '"></div>' +
+    '<div class="field"><label for="f-e">해설</label><input class="input" id="f-e" value="' + esc(q.explanation) + '"></div>' +
+    '<div class="err" id="f-err"></div>' +
+    '<div class="row"><button class="btn" type="submit">저장</button><button class="btn ghost" type="button" id="f-x">닫기</button><span class="grow"></span>' +
+    (q.id ? '<button class="btn ghost" type="button" id="f-d">삭제</button>' : "") + "</div></form>";
+  document.body.appendChild(m);
+  const kindSel = m.querySelector("#f-k");
+  function syncKind() {
+    const mc = kindSel.value === "mc";
+    m.querySelector("#f-cw").hidden = !mc;
+    m.querySelector("#f-al").textContent = mc ? "정답 보기 번호 (1부터, 복수 정답은 쉼표)" : "인정할 답 (쉼표로 여러 개)";
+  }
+  kindSel.onchange = syncKind; syncKind();
+  m.querySelector("#f-x").onclick = function () { m.remove(); };
+  let delArmed = false;
+  const del = m.querySelector("#f-d");
+  if (del) del.onclick = async function () {
+    if (!delArmed) { delArmed = true; del.textContent = "정말 삭제"; del.className = "btn red"; return; }
+    const r = await rpc("teacher_delete_question", { p_pin: T.pin, p_qid: q.id });
+    if (r.error) { m.querySelector("#f-err").textContent = r.error; return; }
+    m.remove(); toast("삭제했어요"); loadTeacher(true);
+  };
+  m.querySelector("#qf").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const kind = kindSel.value;
+    const choices = [];
+    for (const line of m.querySelector("#f-c").value.split("\n")) { if (line.trim()) choices.push(line.trim()); }
+    const answer = [];
+    for (const a of m.querySelector("#f-a").value.split(",")) { if (a.trim()) answer.push(a.trim()); }
+    const payload = {
+      id: q.id || "", session: parseInt(m.querySelector("#f-s").value, 10), qno: parseInt(m.querySelector("#f-n").value, 10),
+      label: m.querySelector("#f-l").value.trim(), kind: kind, body: m.querySelector("#f-b").value.trim(),
+      choices: kind === "mc" ? choices : [], answer: answer, explanation: m.querySelector("#f-e").value.trim(),
+      points: parseInt(m.querySelector("#f-p").value, 10) || 0
+    };
+    if (kind === "mc") {
+      for (const a of answer) {
+        const i = parseInt(a, 10);
+        if (!(i >= 1 && i <= choices.length)) { m.querySelector("#f-err").textContent = "정답 번호는 1~" + choices.length + " 사이여야 해요."; return; }
+      }
+    }
+    const r = await rpc("teacher_save_question", { p_pin: T.pin, p_q: payload });
+    if (r.error) { m.querySelector("#f-err").textContent = r.error; return; }
+    m.remove(); toast("저장했어요"); loadTeacher(true);
+  });
+}
+
+async function loadStudents() {
+  const el = document.getElementById("studs");
+  const r = await rpc("teacher_students", { p_pin: T.pin });
+  if (r.error) { el.innerHTML = '<div class="err">' + esc(r.error) + "</div>"; return; }
+  T.studs = r.students;
+  let h = '<div class="row" style="margin-bottom:10px"><h2 class="grow">누적 점수 (정답 공개된 문제 기준)</h2><button class="btn sm" id="csv">CSV 내려받기</button></div>';
+  if (!r.students.length) { el.innerHTML = h + '<div class="muted">아직 접속한 학생이 없어요.</div>'; bindCsv(); return; }
+  h += '<div class="tbl-wrap"><table class="lb"><thead><tr><th>순위</th><th>학번</th><th>이름</th><th>총점</th><th>정답</th><th>시간(초)</th>';
+  for (let i = 1; i <= SESSIONS; i++) h += "<th>" + i + "차</th>";
+  h += "<th></th></tr></thead><tbody>";
+  for (const s of r.students) {
+    h += "<tr><td>" + (s.rank || "-") + "</td><td>" + esc(s.student_id) + "</td><td>" + esc(s.name) + (s.locked ? ' <span class="pill p-open">잠김</span>' : "") +
+      "</td><td><b>" + s.points + "</b></td><td>" + s.correct + "</td><td>" + s.time_s + "</td>";
+    for (let i = 1; i <= SESSIONS; i++) h += "<td>" + (s.by_session[i] != null ? s.by_session[i] : "") + "</td>";
+    h += '<td class="row" style="flex-wrap:nowrap"><button class="btn ghost sm" data-reset="' + esc(s.student_id) + '">PIN 초기화</button>' +
+      '<button class="btn ghost sm" data-fix="' + esc(s.student_id) + '">수정</button></td></tr>';
+  }
+  h += '</tbody></table></div><p class="small muted">동점이면 정답 수가 많은 학생, 그다음 정답을 낸 시간 합이 짧은 학생이 앞서요.</p>' +
+    '<details><summary class="small muted">선생님 PIN 바꾸기</summary><div class="row" style="margin-top:8px"><input class="input" id="npin" type="password" placeholder="새 PIN (4자리 이상)" style="max-width:220px"><button class="btn sm" id="npinb">변경</button></div></details>';
+  el.innerHTML = h;
+  bindCsv();
+  for (const b of el.querySelectorAll("[data-reset]")) {
+    b.onclick = async function () {
+      const np = window.prompt(b.dataset.reset + " 학생의 새 PIN 4자리", b.dataset.reset.slice(-4));
+      if (!np) return;
+      const x = await rpc("teacher_reset_student", { p_pin: T.pin, p_sid: b.dataset.reset, p_new_pin: np });
+      toast(x.error || "PIN을 " + np + "(으)로 바꿨어요");
+      loadStudents();
+    };
+  }
+  for (const b of el.querySelectorAll("[data-fix]")) {
+    b.onclick = async function () {
+      const s = T.studs.find(function (x) { return x.student_id === b.dataset.fix; });
+      const nid = window.prompt("학번 (잘못 입력했다면 고치세요)", s.student_id); if (!nid) return;
+      const nn = window.prompt("이름", s.name); if (!nn) return;
+      const x = await rpc("teacher_update_student", { p_pin: T.pin, p_sid: s.student_id, p_new_sid: nid, p_name: nn });
+      toast(x.error || "수정했어요");
+      loadStudents();
+    };
+  }
+  document.getElementById("npinb").onclick = async function () {
+    const v = document.getElementById("npin").value;
+    const x = await rpc("teacher_change_pin", { p_pin: T.pin, p_new: v });
+    if (x.error) { toast(x.error); return; }
+    sstore("quiz_tpin", v); T.pin = v; toast("선생님 PIN을 바꿨어요");
+  };
+}
+
+function bindCsv() {
+  document.getElementById("csv").onclick = function () {
+    const rows = [["순위", "학번", "이름", "총점", "정답수", "정답시간합(초)"]];
+    for (let i = 1; i <= SESSIONS; i++) rows[0].push(i + "차시");
+    for (const s of T.studs || []) {
+      const r = [s.rank || "", s.student_id, s.name, s.points, s.correct, s.time_s];
+      for (let i = 1; i <= SESSIONS; i++) r.push(s.by_session[i] != null ? s.by_session[i] : "");
+      rows.push(r);
+    }
+    const lines = [];
+    for (const r of rows) {
+      const cells = [];
+      for (const c of r) cells.push('"' + String(c).replace(/"/g, '""') + '"');
+      lines.push(cells.join(","));
+    }
+    const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "AI-POT_확인퀴즈_점수_" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+}
+
+// =====================================================================
+//  프로젝터 화면 (#screen-차시)
+// =====================================================================
+const V = { session: 1, data: null, sig: "", pin: null };
+
+function screenView(session) {
+  V.session = session; V.pin = null; V.sig = "";
+  loadScreen(true);
+  onLive(function () { loadScreen(false); });
+  timer = setInterval(function () { loadScreen(false); }, 2000);
+}
+
+async function loadScreen(force) {
+  const r = await rpc("screen_state", { p_session: V.session });
+  if (r.error) { app.innerHTML = '<div class="wrap"><div class="card err">' + esc(r.error) + "</div></div>"; return; }
+  const sig = JSON.stringify(r);
+  if (!force && sig === V.sig) return;
+  V.sig = sig; V.data = r;
+  renderScreen();
+}
+
+function renderScreen() {
+  const d = V.data;
+  const qs = d.questions;
+  let cur = null;
+  if (V.pin) cur = qs.find(function (q) { return q.id === V.pin; }) || null;
+  if (!cur) cur = qs.find(function (q) { return q.status === "open"; }) || qs.find(function (q) { return q.status === "locked"; }) || qs[0] || null;
+
+  let main = "";
+  if (!cur) {
+    main = '<div class="card empty" style="display:grid;place-items:center;gap:12px"><h1 style="font-size:40px">' + V.session + '차시 확인퀴즈</h1>' +
+      '<p class="muted" style="font-size:22px">QR을 찍고 학번으로 입장하세요. 문제가 열리면 바로 나타나요.</p><div style="width:min(360px,70vw)" class="qrbox" id="qrbig"></div>' +
+      '<div class="url" style="font-size:22px">' + esc(BASE_URL) + "</div></div>";
+  } else {
+    main = '<div class="card stack"><div class="row"><span class="q-label" style="font-size:18px">' + esc(cur.label) + "</span>" + statusPill(cur.status) + "</div>" +
+      '<div class="q-body">' + esc(cur.body) + "</div>";
+    if (cur.kind === "mc") {
+      const counts = cur.choices.map(function () { return 0; });
+      if (cur.dist) for (const g of cur.dist) { const i = parseInt(g.response, 10) - 1; if (i >= 0 && i < counts.length) counts[i] += g.n; }
+      main += '<div class="choices">';
+      for (let i = 0; i < cur.choices.length; i++) {
+        const ok = cur.answer && cur.answer.indexOf(String(i + 1)) >= 0;
+        main += '<div class="choice' + (ok ? " ok" : "") + '"><span class="n">' + (i + 1) + '</span><span class="grow">' + esc(cur.choices[i]) + "</span>" +
+          (cur.status === "revealed" ? "<b>" + counts[i] + "명</b>" : "") + "</div>";
+      }
+      main += "</div>";
+    } else if (cur.status === "revealed") {
+      main += '<div class="note ok" style="font-size:26px">정답: ' + esc(cur.answer[0]) + "</div>";
+      if (cur.dist && cur.dist.length) {
+        main += '<div class="stack" style="gap:6px">';
+        for (const g of cur.dist) main += '<div class="row" style="font-size:20px"><span class="pill ' + (g.ok ? "p-revealed" : "p-ready") + '">' + (g.ok ? "정답" : "오답") + "</span><span>" + esc(g.response) + '</span><span class="muted">' + g.n + "명</span></div>";
+        main += "</div>";
+      }
+    } else {
+      main += '<div class="note ex" style="font-size:22px">단답형 · 철자와 띄어쓰기까지 정확하게!</div>';
+    }
+    if (cur.status === "revealed") {
+      const rate = cur.submitted ? Math.round(cur.correct * 100 / cur.submitted) : 0;
+      main += '<div class="row" style="font-size:22px"><b>정답률 ' + rate + "%</b><span class=\"muted\">(" + cur.correct + " / " + cur.submitted + "명)</span></div>";
+      if (cur.explanation) main += '<div class="note ex" style="font-size:22px">' + esc(cur.explanation) + "</div>";
+    } else {
+      main += '<div class="row"><span class="big-count">' + cur.submitted + '</span><span style="font-size:22px" class="muted">명 제출</span>' +
+        (cur.status === "open" ? '<span class="dot" style="margin-left:6px"></span>' : "") + "</div>";
+    }
+    main += "</div>";
+    if (qs.length > 1) {
+      main += '<div class="chips">';
+      for (const q of qs.slice().sort(function (a, b) { return a.qno - b.qno; })) {
+        main += '<button class="chip" data-show="' + q.id + '" aria-pressed="' + (q.id === cur.id) + '">' + esc(q.label || q.qno) + "</button>";
+      }
+      main += "</div>";
+    }
+  }
+
+  let side = '<div class="stack">';
+  if (cur) side += '<div class="qrbox" id="qrsmall"></div><div class="url small">' + esc(BASE_URL) + "</div>";
+  side += '<div class="card"><h2>' + V.session + "차시 TOP 5</h2>" + boardHtml(d.top_session) + "</div>" +
+    '<div class="card"><h2>누적 TOP 10</h2>' + boardHtml(d.top_all) + "</div>" +
+    '<div class="row small muted"><span>차시</span><select class="input" id="ssel" style="width:auto;padding:6px 10px">';
+  for (let i = 1; i <= SESSIONS; i++) side += '<option value="' + i + '"' + (i === V.session ? " selected" : "") + ">" + i + "</option>";
+  side += "</select><span>· 학생 " + d.students + "명</span></div></div>";
+
+  app.innerHTML = '<div class="screen"><div class="stack">' + main + "</div>" + side + "</div>";
+  const qEl = document.getElementById(cur ? "qrsmall" : "qrbig");
+  if (qEl && window.QRCode) new QRCode(qEl, { text: BASE_URL, width: 512, height: 512, correctLevel: QRCode.CorrectLevel.M });
+  for (const b of app.querySelectorAll("[data-show]")) {
+    b.onclick = function () { V.pin = Number(b.dataset.show); renderScreen(); };
+  }
+  document.getElementById("ssel").onchange = function (e) { location.hash = "screen-" + e.target.value; };
+}
+
+function boardHtml(list) {
+  if (!list || !list.length) return '<p class="muted small" style="margin:8px 0 0">정답이 공개되면 순위가 나타나요.</p>';
+  let h = '<table class="lb" style="margin-top:6px"><tbody>';
+  for (const p of list) {
+    h += '<tr><td style="width:40px"><span class="medal ' + (p.rank <= 3 ? "m" + p.rank : "") + '">' + p.rank + "</span></td><td>" + esc(p.name) +
+      ' <span class="muted small">' + esc(p.sid) + '</span></td><td style="text-align:right"><b>' + p.points + "</b></td></tr>";
+  }
+  return h + "</tbody></table>";
+}
+
+// ---------- 시작 ----------
+(function start() {
+  if (!window.supabase || !CFG.SUPABASE_URL || CFG.SUPABASE_URL.indexOf("YOUR-") >= 0) {
+    app.innerHTML = '<div class="wrap"><div class="card stack"><h1>설정이 필요해요</h1><p>config.js 파일에 Supabase 주소(SUPABASE_URL)와 anon 키를 넣어 주세요.</p></div></div>';
+    return;
+  }
+  sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  document.title = CFG.TITLE || document.title;
+  window.addEventListener("hashchange", route);
+  route();
+})();
+</script>
+</body>
+</html>
