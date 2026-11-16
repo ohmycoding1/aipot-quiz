@@ -115,9 +115,10 @@ h2 { font-size: 18px; margin: 0; }
 .sess-list { display: grid; gap: 10px; }
 .sess-item { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; border: 0; background: var(--card); border-radius: 16px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
 .sess-item .no { width: 46px; height: 46px; border-radius: 12px; background: var(--navyT); color: var(--navy); font-weight: 800; display: grid; place-items: center; font-size: 15px; }
-.sess-item .meta { flex: 1; }
+.sess-item .meta { flex: 1; min-width: 0; }
 .sess-item .meta b { display: block; font-size: 16px; }
 .sess-item .meta span { color: var(--sub); font-size: 13px; }
+.sess-item .mst { font-style: normal; font-weight: 700; color: var(--teal); }
 .sess-item .pts { font-weight: 800; color: var(--teal); }
 .back { border: 0; background: transparent; color: var(--navy); font-weight: 700; padding: 4px 0; }
 .hchip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border-radius: 999px; padding: 6px 12px; font-weight: 800; color: var(--navy); font-size: 14px; box-shadow: 0 1px 2px rgba(17,24,39,.06); }
@@ -303,7 +304,7 @@ function route() {
 // =====================================================================
 //  학생 화면
 // =====================================================================
-const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mdraft: {}, mfile: {}, mbusy: {}, pending: false };
+const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mopen: null, mdraft: {}, mfile: {}, mbusy: {}, pending: false };
 
 function studentView() {
   const token = store("quiz_token");
@@ -475,7 +476,7 @@ function renderStudent() {
 
   document.getElementById("logout").onclick = function () { store("quiz_token", null); route(); };
   for (const b of app.querySelectorAll("[data-tab]")) {
-    b.onclick = function () { S.tab = b.dataset.tab; S.past = null; S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
+    b.onclick = function () { S.tab = b.dataset.tab; S.past = null; S.mopen = null; S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
   }
   for (const b of app.querySelectorAll("[data-past]")) {
     b.onclick = function () { S.past = Number(b.dataset.past); S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
@@ -527,20 +528,41 @@ function missionTab() {
     return (o[a.status] - o[b.status]) || (b.session - a.session) || (a.mno - b.mno);
   });
   if (!ms.length) return '<div class="sec-title">미션</div><div class="card empty"><span class="dot"></span><h2 style="margin-top:10px">선생님이 미션을 열면 여기에 나타나요</h2><p class="muted small">글이나 파일(사진 · PDF 등)로 결과를 올려요.</p></div>';
-  let h = '<div class="sec-title">미션</div>';
-  for (const m of ms) {
-    const st = MSTATUS[m.status] || ["", ""];
-    h += '<div class="card stack" id="m-' + m.id + '"><div class="row"><span class="q-label grow">' + m.session + "차시 미션 " + m.mno + '</span><span class="pill ' + st[1] + '">' + st[0] + "</span></div>" +
-      "<h2>" + esc(m.title) + "</h2>" + (m.body ? '<div class="m-body">' + esc(m.body) + "</div>" : "");
-    if (m.status === "open") h += missionForm(m);
-    else {
-      if (m.mine) h += '<div class="small muted">내 제출 · ' + fmtTime(m.mine.updated_at) + "</div>" + (m.mine.body ? '<pre class="subpre">' + esc(m.mine.body) + "</pre>" : "") + (m.mine.file_path ? '<div class="fbox">' + fileView(m.mine) + "</div>" : "");
-      else h += '<div class="note ex">제출하지 않았어요.</div>';
-      if (m.status === "shared") h += gallery(m);
+  if (S.mopen != null && !ms.some(function (m) { return m.id === S.mopen; })) S.mopen = null;
+  if (S.mopen != null) {
+    const m = ms.find(function (x) { return x.id === S.mopen; });
+    return '<div class="row"><button class="back" id="mback">‹ 미션 목록</button></div>' + missionCard(m);
+  }
+  const openM = ms.filter(function (m) { return m.status === "open"; });
+  const doneM = ms.filter(function (m) { return m.status !== "open"; });
+  let h = "";
+  if (openM.length) {
+    h += '<div class="sec-title">지금 제출할 미션</div>';
+    for (const m of openM) h += missionCard(m);
+  }
+  if (doneM.length) {
+    h += '<div class="sec-title">' + (openM.length ? "지난 미션" : "미션") + '</div><div class="sess-list">';
+    for (const m of doneM) {
+      const n = (m.gallery || []).length;
+      h += '<button class="sess-item" data-mopen="' + m.id + '"><span class="no">' + m.session + '차시</span><span class="meta"><b>' + esc(m.title) + "</b><span>" +
+        (m.status === "shared" ? '<em class="mst">결과 공개 · ' + n + "개" + (m.my_vote ? " · 투표함" : " · 투표하기") + "</em>" : "마감") + " · " + (m.mine ? "제출함" : "제출 안 함") +
+        '</span></span><span class="muted">›</span></button>';
     }
     h += "</div>";
   }
   return h;
+}
+function missionCard(m) {
+  const st = MSTATUS[m.status] || ["", ""];
+  let h = '<div class="card stack" id="m-' + m.id + '"><div class="row"><span class="q-label grow">' + m.session + "차시 미션 " + m.mno + '</span><span class="pill ' + st[1] + '">' + st[0] + "</span></div>" +
+    "<h2>" + esc(m.title) + "</h2>" + (m.body ? '<div class="m-body">' + esc(m.body) + "</div>" : "");
+  if (m.status === "open") h += missionForm(m);
+  else {
+    if (m.mine) h += '<div class="small muted">내 제출 · ' + fmtTime(m.mine.updated_at) + "</div>" + (m.mine.body ? '<pre class="subpre">' + esc(m.mine.body) + "</pre>" : "") + (m.mine.file_path ? '<div class="fbox">' + fileView(m.mine) + "</div>" : "");
+    else h += '<div class="note ex">제출하지 않았어요.</div>';
+    if (m.status === "shared") h += gallery(m);
+  }
+  return h + "</div>";
 }
 function missionForm(m) {
   const id = m.id, mine = m.mine;
@@ -573,6 +595,11 @@ function gallery(m) {
   return h + "</div>";
 }
 function bindMissions() {
+  for (const b of app.querySelectorAll("[data-mopen]")) {
+    b.onclick = function () { S.mopen = Number(b.dataset.mopen); renderStudent(); window.scrollTo(0, 0); };
+  }
+  const mb = document.getElementById("mback");
+  if (mb) mb.onclick = function () { S.mopen = null; renderStudent(); window.scrollTo(0, 0); };
   for (const ta of app.querySelectorAll("[data-mtext]")) {
     ta.oninput = function () { S.mdraft[ta.dataset.mtext] = ta.value; };
     ta.onblur = function () { if (S.pending) { S.pending = false; setTimeout(renderStudent, 0); } };
