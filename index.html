@@ -138,6 +138,29 @@ h2 { font-size: 18px; margin: 0; }
 .has-nav .top .grow > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .has-nav .hchip, .has-nav .top .btn { flex: none; }
 @media (max-width: 380px) { .has-nav .top .brand { font-size: 15px; } .has-nav .hchip { padding: 5px 10px; font-size: 13px; } }
+/* 미션 */
+.m-body { white-space: pre-wrap; word-break: keep-all; color: var(--ink); background: var(--bg); border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
+.fbox { border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.fbox img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; background: var(--bg); }
+.fname { font-weight: 700; word-break: break-all; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.gal { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.gitem { border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; }
+.gitem.mine { border-color: var(--orange); }
+.gitem img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--bg); display: block; }
+.gitem .gb { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.gitem pre, .subpre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 14px/1.5 var(--font); max-height: 220px; overflow: auto; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.vote { border: 0; border-radius: 10px; padding: 8px 12px; font-weight: 800; background: var(--bg); color: var(--sub); }
+.vote[aria-pressed="true"] { background: var(--redT); color: var(--red); }
+.p-shared { background: var(--tealT); color: var(--teal); }
+.p-closed { background: var(--navyT); color: var(--navy); }
+.mbanner { background: var(--orangeT); color: var(--orange); border: 0; border-radius: 14px; padding: 14px 16px; font-weight: 800; text-align: left; display: flex; gap: 10px; align-items: center; }
+.subrow { display: grid; grid-template-columns: 160px minmax(0, 1fr) 140px; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.subrow:last-child { border-bottom: 0; }
+.subrow img { width: 140px; height: 105px; object-fit: cover; border-radius: 10px; background: var(--bg); }
+@media (max-width: 700px) { .subrow { grid-template-columns: 1fr; } }
 /* 학생 화면 복사·붙여넣기 막기 */
 body.noCopy { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 body.noCopy input, body.noCopy textarea { -webkit-user-select: text; user-select: text; }
@@ -225,7 +248,7 @@ function myText(q, r) {
 (function () {
   const on = function () { return document.body.classList.contains("noCopy"); };
   const isField = function (el) { return el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"); };
-  const isLogin = function (el) { return el && (el.id === "sid" || el.id === "spin" || el.id === "sname"); };
+  const isLogin = function (el) { return el && (el.id === "sid" || el.id === "spin" || el.id === "sname" || (el.dataset && el.dataset.allowpaste === "1")); };
   let last = 0;
   const warn = function (m) { const n = Date.now(); if (n - last > 1500) { last = n; toast(m); } };
   ["copy", "cut"].forEach(function (ev) {
@@ -280,7 +303,7 @@ function route() {
 // =====================================================================
 //  학생 화면
 // =====================================================================
-const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {} };
+const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mdraft: {}, mfile: {}, mbusy: {}, pending: false };
 
 function studentView() {
   const token = store("quiz_token");
@@ -325,18 +348,24 @@ function studentLogin(msg) {
 }
 
 async function loadStudent(force) {
-  const r = await rpc("student_state", { p_token: S.token });
+  const both = await Promise.all([rpc("student_state", { p_token: S.token }), rpc("student_missions", { p_token: S.token })]);
+  const r = both[0], mr = both[1];
   if (r.error === "LOGIN") { store("quiz_token", null); return studentLogin("다시 로그인해 주세요."); }
   if (r.error) { if (force) app.innerHTML = '<div class="wrap"><div class="card err">' + esc(r.error) + "</div></div>"; return; }
-  const sig = JSON.stringify(r);
+  const ms = mr && !mr.error && mr.missions ? mr.missions : [];
+  const sig = JSON.stringify(r) + JSON.stringify(ms);
   if (!force && sig === S.sig) return;
-  S.sig = sig; S.data = r;
+  S.sig = sig; S.data = r; S.missions = ms;
+  // 미션 글을 쓰는 중이면 화면을 다시 그리지 않고 기다림
+  const ae = document.activeElement;
+  if (!force && ae && ae.dataset && ae.dataset.mtext) { S.pending = true; return; }
   renderStudent();
 }
 
 const ICON = {
   live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>',
   past: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>',
+  mission: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>',
   rank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>'
 };
 function renderStudent() {
@@ -363,7 +392,10 @@ function renderStudent() {
     '<span class="hchip">' + sc.points + "점" + (sc.rank ? " · " + sc.rank + "위" : "") + "</span>" +
     '<button class="btn ghost sm" id="logout">나가기</button></div>';
 
+  const openM = S.missions.filter(function (m) { return m.status === "open"; });
+  const todoM = openM.filter(function (m) { return !m.mine; }).length;
   if (S.tab === "live") {
+    if (openM.length) html += '<button class="mbanner" data-tab="mission">' + ICON.mission.replace("<svg", '<svg width="22" height="22"') + '<span class="grow">미션이 열렸어요: ' + esc(openM[0].title) + (openM.length > 1 ? " 외 " + (openM.length - 1) + "개" : "") + "</span><span>미션 탭 ›</span></button>";
     if (!live.length) {
       if (sessions.length) {
         const n = sessions[0], st = stat(by[n]);
@@ -423,6 +455,8 @@ function renderStudent() {
       if (!shown.length) html += '<div class="card empty muted">틀린 문제가 없어요. 완벽해요!</div>';
       shown.forEach(function (q) { html += studentCard(q, list.indexOf(q) + 1, list.length); });
     }
+  } else if (S.tab === "mission") {
+    html += missionTab();
   } else {
     html += '<div class="card score"><div><b>' + sc.points + '</b><span>내 점수</span></div><div><b>' + sc.correct + '</b><span>맞힌 문제</span></div>' +
       "<div><b>" + (sc.rank ? sc.rank + '<small style="font-size:15px">/' + sc.total + "</small>" : "-") + "</b><span>내 순위</span></div></div>" +
@@ -430,7 +464,7 @@ function renderStudent() {
       '<p class="muted small" style="text-align:center">상위 5명만 공개돼요. 이름 가운데는 * 로 가려져요.</p>';
   }
   html += "</div>";
-  const tabs = [["live", "진행 중", todoList.length], ["past", "지난 시험", 0], ["rank", "순위", 0]];
+  const tabs = [["live", "진행 중", todoList.length], ["mission", "미션", todoM], ["past", "지난 시험", 0], ["rank", "순위", 0]];
   html += '<nav class="bnav" role="tablist">' + tabs.map(function (t) {
     return '<button role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + ICON[t[0]] + "<span>" + t[1] + "</span>" +
       (t[2] ? '<span class="badge">' + t[2] + "</span>" : "") + "</button>";
@@ -452,6 +486,7 @@ function renderStudent() {
   for (const b of app.querySelectorAll("[data-filter]")) {
     b.onclick = function () { S.filter = b.dataset.filter; renderStudent(); };
   }
+  bindMissions();
   const pb = document.getElementById("pastback");
   if (pb) pb.onclick = function () { S.past = null; renderStudent(); window.scrollTo(0, 0); };
   const jb = document.getElementById("jump");
@@ -472,6 +507,123 @@ function renderStudent() {
   if (focusId) { const el = document.getElementById(focusId); if (el) el.focus({ preventScroll: true }); }
   if (S.tab === "rank") loadBoard(document.getElementById("lbcard"), null, 5, d.me, sc);
   if (S.jump) { S.jump = false; setTimeout(scrollToNext, 350); }
+}
+
+// ---------- 미션 (학생) ----------
+const FILE_ACCEPT = "image/*,.pdf,.txt,.py,.csv,.json,.zip,.docx,.pptx,.xlsx";
+function fileUrl(path) { return CFG.SUPABASE_URL + "/storage/v1/object/public/missions/" + path.split("/").map(encodeURIComponent).join("/"); }
+function isImg(t, n) { return /^image\/(png|jpe?g|gif|webp)$/i.test(t || "") || /\.(png|jpe?g|gif|webp)$/i.test(n || ""); }
+function fileView(f, big) {
+  if (!f || !f.file_path) return "";
+  const u = fileUrl(f.file_path);
+  if (isImg(f.file_type, f.file_name)) return '<a href="' + u + '" target="_blank" rel="noopener"><img src="' + u + '" alt="' + esc(f.file_name || "첨부 그림") + '" loading="lazy"></a>';
+  return '<a class="btn ghost sm" href="' + u + '" target="_blank" rel="noopener">📎 ' + esc(f.file_name || "첨부 파일") + "</a>";
+}
+function fmtTime(t) { try { const d = new Date(t); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); } catch (e) { return ""; } }
+const MSTATUS = { open: ["제출 중", "p-open"], closed: ["마감", "p-closed"], shared: ["결과 공개 · 투표", "p-shared"] };
+function missionTab() {
+  const ms = S.missions.slice().sort(function (a, b) {
+    const o = { open: 0, shared: 1, closed: 2 };
+    return (o[a.status] - o[b.status]) || (b.session - a.session) || (a.mno - b.mno);
+  });
+  if (!ms.length) return '<div class="sec-title">미션</div><div class="card empty"><span class="dot"></span><h2 style="margin-top:10px">선생님이 미션을 열면 여기에 나타나요</h2><p class="muted small">글이나 파일(사진 · PDF 등)로 결과를 올려요.</p></div>';
+  let h = '<div class="sec-title">미션</div>';
+  for (const m of ms) {
+    const st = MSTATUS[m.status] || ["", ""];
+    h += '<div class="card stack" id="m-' + m.id + '"><div class="row"><span class="q-label grow">' + m.session + "차시 미션 " + m.mno + '</span><span class="pill ' + st[1] + '">' + st[0] + "</span></div>" +
+      "<h2>" + esc(m.title) + "</h2>" + (m.body ? '<div class="m-body">' + esc(m.body) + "</div>" : "");
+    if (m.status === "open") h += missionForm(m);
+    else {
+      if (m.mine) h += '<div class="small muted">내 제출 · ' + fmtTime(m.mine.updated_at) + "</div>" + (m.mine.body ? '<pre class="subpre">' + esc(m.mine.body) + "</pre>" : "") + (m.mine.file_path ? '<div class="fbox">' + fileView(m.mine) + "</div>" : "");
+      else h += '<div class="note ex">제출하지 않았어요.</div>';
+      if (m.status === "shared") h += gallery(m);
+    }
+    h += "</div>";
+  }
+  return h;
+}
+function missionForm(m) {
+  const id = m.id, mine = m.mine;
+  const text = S.mdraft[id] != null ? S.mdraft[id] : (mine ? mine.body : "");
+  const pf = S.mfile[id];
+  const cur = pf === null ? null : pf ? { file_path: pf.path, file_name: pf.name, file_type: pf.type } : (mine && mine.file_path ? mine : null);
+  const dirty = (S.mdraft[id] != null && S.mdraft[id] !== (mine ? mine.body : "")) || pf !== undefined;
+  let h = "";
+  if (m.allow_text) h += '<textarea class="input" id="mt-' + id + '" data-mtext="' + id + '" data-allowpaste="1" placeholder="여기에 프롬프트 · 결과 · 답을 써요. (붙여넣기 가능)">' + esc(text) + "</textarea>";
+  if (m.allow_file) {
+    h += '<div class="fbox">' + (S.mbusy[id] === "up" ? '<span class="muted">파일 올리는 중…</span>' : cur ? fileView(cur) + '<span class="grow small muted">' + esc(cur.file_name || "") + "</span>" : '<span class="grow muted small">사진 · PDF · 파일 1개 (10MB 이하)</span>') +
+      '<label class="btn ghost sm filebtn">' + (cur ? "파일 바꾸기" : "파일 선택") + '<input type="file" data-mfile="' + id + '" accept="' + FILE_ACCEPT + '"></label>' +
+      (cur ? '<button class="btn ghost sm" data-mclear="' + id + '">빼기</button>' : "") + "</div>";
+  }
+  h += '<div class="row"><span class="small muted grow">' + (mine ? "제출됨 · " + fmtTime(mine.updated_at) + (dirty ? " · 고친 내용은 다시 제출해야 반영돼요" : "") : "아직 제출하지 않았어요") + "</span>" +
+    '<button class="btn orange" data-msubmit="' + id + '"' + (S.mbusy[id] ? " disabled" : "") + ">" + (S.mbusy[id] === "send" ? "제출 중…" : mine ? (dirty ? "다시 제출" : "제출 완료 ✓") : "제출하기") + "</button></div>" +
+    '<p class="small muted" style="margin:0">마감 전까지는 고쳐서 다시 제출할 수 있어요.</p>';
+  return h;
+}
+function gallery(m) {
+  const g = m.gallery || [];
+  if (!g.length) return '<div class="note ex">아직 올라온 결과가 없어요.</div>';
+  let h = '<div class="sec-title" style="margin-top:4px">모두의 결과 · ' + g.length + "개" + (m.my_vote ? "" : " · 마음에 드는 작품에 1표!") + '</div><div class="gal">';
+  for (const x of g) {
+    h += '<div class="gitem' + (x.me ? " mine" : "") + '">' + (x.file_path && isImg(x.file_type, x.file_name) ? fileView(x) : "") +
+      '<div class="gb"><div class="row"><b class="grow">' + esc(x.name) + (x.me ? " (나)" : "") + "</b>" +
+      '<button class="vote" data-mvote="' + x.id + '" aria-pressed="' + (m.my_vote === x.id) + '"' + (x.me ? " disabled" : "") + ">♥ " + x.votes + "</button></div>" +
+      (x.file_path && !isImg(x.file_type, x.file_name) ? fileView(x) : "") + (x.body ? "<pre>" + esc(x.body) + "</pre>" : "") + "</div></div>";
+  }
+  return h + "</div>";
+}
+function bindMissions() {
+  for (const ta of app.querySelectorAll("[data-mtext]")) {
+    ta.oninput = function () { S.mdraft[ta.dataset.mtext] = ta.value; };
+    ta.onblur = function () { if (S.pending) { S.pending = false; setTimeout(renderStudent, 0); } };
+  }
+  for (const inp of app.querySelectorAll("[data-mfile]")) {
+    inp.onchange = function () { if (inp.files && inp.files[0]) uploadMissionFile(Number(inp.dataset.mfile), inp.files[0]); };
+  }
+  for (const b of app.querySelectorAll("[data-mclear]")) {
+    b.onclick = function () { S.mfile[b.dataset.mclear] = null; renderStudent(); };
+  }
+  for (const b of app.querySelectorAll("[data-msubmit]")) {
+    b.onclick = function () { submitMission(Number(b.dataset.msubmit)); };
+  }
+  for (const b of app.querySelectorAll("[data-mvote]")) {
+    b.onclick = async function () {
+      const r = await rpc("student_mission_vote", { p_token: S.token, p_sub: Number(b.dataset.mvote) });
+      if (r.error) toast(r.error); else toast("투표했어요");
+      loadStudent(true);
+    };
+  }
+}
+async function uploadMissionFile(id, f) {
+  if (f.size > 10 * 1024 * 1024) { toast("10MB 이하 파일만 올릴 수 있어요"); return; }
+  S.mbusy[id] = "up"; renderStudent();
+  try {
+    const t = await rpc("student_mission_ticket", { p_token: S.token, p_mid: id });
+    if (t.error) { toast(t.error); return; }
+    const m = /\.[A-Za-z0-9]{1,6}$/.exec(f.name);
+    const path = t.ticket + "/" + Date.now() + (m ? m[0].toLowerCase() : "");
+    const up = await sb.storage.from("missions").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
+    if (up.error) { toast("업로드 실패: " + up.error.message); return; }
+    S.mfile[id] = { path: path, name: f.name, type: f.type || "" };
+    toast("파일을 올렸어요. 제출을 눌러야 반영돼요");
+  } finally { S.mbusy[id] = null; renderStudent(); }
+}
+async function submitMission(id) {
+  const m = S.missions.find(function (x) { return x.id === id; });
+  if (!m) return;
+  const ta = document.getElementById("mt-" + id);
+  if (ta) S.mdraft[id] = ta.value;
+  const pf = S.mfile[id];
+  S.mbusy[id] = "send"; renderStudent();
+  const r = await rpc("student_mission_submit", {
+    p_token: S.token, p_mid: id, p_body: S.mdraft[id] != null ? S.mdraft[id] : (m.mine ? m.mine.body : ""),
+    p_file_path: pf ? pf.path : null, p_file_name: pf ? pf.name : null, p_file_type: pf ? pf.type : null, p_clear_file: pf === null
+  });
+  S.mbusy[id] = null;
+  if (r.error) { toast(r.error); renderStudent(); return; }
+  delete S.mdraft[id]; delete S.mfile[id];
+  toast("제출했어요");
+  loadStudent(true);
 }
 
 function saveDrafts() { store("quiz_drafts_" + S.token, JSON.stringify({ pick: S.pick, draft: S.draft })); }
@@ -604,7 +756,7 @@ function teacherView() {
   T.pin = pin;
   app.innerHTML = '<div class="wrap wide"><div class="card empty muted">불러오는 중…</div></div>';
   loadTeacher(true);
-  timer = setInterval(function () { if (T.tab === "run") loadTeacher(false); }, 2500);
+  timer = setInterval(function () { if (T.tab === "run") loadTeacher(false); else if (T.tab === "mission") loadTMissions(false); }, 3000);
 }
 
 function teacherLogin(msg) {
@@ -646,6 +798,7 @@ function renderTeacher() {
     h += '<button class="chip" data-sess="' + i + '" aria-pressed="' + (i === T.session) + '">' + i + "차시</button>";
   }
   h += '</div><div class="tabs" role="tablist"><button role="tab" data-ttab="run" aria-selected="' + (T.tab === "run") + '">문제 운영</button>' +
+    '<button role="tab" data-ttab="mission" aria-selected="' + (T.tab === "mission") + '">미션</button>' +
     '<button role="tab" data-ttab="students" aria-selected="' + (T.tab === "students") + '">점수 · 학생</button></div>';
 
   if (T.tab === "run") {
@@ -666,6 +819,8 @@ function renderTeacher() {
       '<button class="btn ghost sm" id="newq">+ 새 문제</button></div></div>';
     if (!qs.length) h += '<div class="card empty muted">' + T.session + "차시 문제가 아직 없어요. ‘+ 새 문제’로 추가하세요.</div>";
     for (const q of qs) h += teacherCard(q, d.students);
+  } else if (T.tab === "mission") {
+    h += '<div class="stack" id="tmis"><div class="card muted">불러오는 중…</div></div>';
   } else {
     h += '<div class="card" id="studs"><div class="muted">불러오는 중…</div></div>';
   }
@@ -673,12 +828,13 @@ function renderTeacher() {
 
   document.getElementById("tout").onclick = function () { sstore("quiz_tpin", null); route(); };
   for (const b of app.querySelectorAll("[data-sess]")) {
-    b.onclick = function () { T.session = parseInt(b.dataset.sess, 10); store("quiz_session", String(T.session)); loadTeacher(true); };
+    b.onclick = function () { T.session = parseInt(b.dataset.sess, 10); store("quiz_session", String(T.session)); T.msig = ""; loadTeacher(true); };
   }
   for (const b of app.querySelectorAll("[data-ttab]")) {
     b.onclick = function () { T.tab = b.dataset.ttab; renderTeacher(); };
   }
   if (T.tab === "students") return loadStudents();
+  if (T.tab === "mission") return loadTMissions(true);
   document.getElementById("newq").onclick = function () {
     const next = T.data.questions.reduce(function (m, q) { return Math.max(m, q.qno); }, 0) + 1;
     editQuestion({ session: T.session, qno: next, label: "", kind: "mc", body: "", choices: ["", "", "", ""], answer: [], explanation: "", points: 10 });
@@ -839,6 +995,98 @@ function editQuestion(q) {
     const r = await rpc("teacher_save_question", { p_pin: T.pin, p_q: payload });
     if (r.error) { m.querySelector("#f-err").textContent = r.error; return; }
     m.remove(); toast("저장했어요"); loadTeacher(true);
+  });
+}
+
+// ---------- 미션 (선생님) ----------
+async function loadTMissions(force) {
+  const r = await rpc("teacher_missions", { p_pin: T.pin, p_session: T.session });
+  if (r.error === "PIN") { sstore("quiz_tpin", null); return teacherLogin("PIN을 다시 입력해 주세요."); }
+  const box = document.getElementById("tmis");
+  if (!box) return;
+  if (r.error) { box.innerHTML = '<div class="card err">미션 기능을 쓰려면 Supabase에서 update_미션.sql을 먼저 실행하세요. (' + esc(r.error) + ")</div>"; return; }
+  const sig = JSON.stringify(r);
+  if (!force && sig === T.msig) return;
+  if (!force && document.querySelector(".modal")) return;
+  T.msig = sig; T.mdata = r;
+  renderTMissions();
+}
+function renderTMissions() {
+  const box = document.getElementById("tmis");
+  if (!box) return;
+  const d = T.mdata;
+  let h = '<div class="card row"><b class="grow">' + T.session + "차시 미션 " + d.missions.length + "개</b>" +
+    '<span class="small muted">열기 → 제출 마감 → 결과 공개(학생끼리 보고 투표)</span><button class="btn ghost sm" id="newm">+ 새 미션</button></div>';
+  if (!d.missions.length) h += '<div class="card empty muted">' + T.session + "차시 미션이 없어요. ‘+ 새 미션’으로 추가하세요.</div>";
+  for (const m of d.missions) {
+    const st = m.status === "ready" ? ["대기", "p-ready"] : MSTATUS[m.status];
+    const subs = m.subs.slice();
+    if (m.status === "shared") subs.sort(function (a, b) { return b.votes - a.votes; });
+    h += '<div class="card stack"><div class="row"><span class="q-label">미션 ' + m.mno + '</span><b class="grow">' + esc(m.title) + '</b><span class="pill ' + st[1] + '">' + st[0] + "</span>" +
+      '<span class="small muted">제출 ' + subs.length + " / " + d.students + "</span></div>" +
+      (m.body ? '<div class="m-body">' + esc(m.body) + "</div>" : "") +
+      '<div class="small muted">받는 것: ' + (m.allow_text ? "글" : "") + (m.allow_text && m.allow_file ? " + " : "") + (m.allow_file ? "파일" : "") + "</div>" +
+      '<div class="row">' +
+      '<button class="btn orange sm" data-mset="open" data-mid="' + m.id + '"' + (m.status === "open" ? " disabled" : "") + ">열기</button>" +
+      '<button class="btn sm" data-mset="closed" data-mid="' + m.id + '"' + (m.status === "open" ? "" : " disabled") + ">제출 마감</button>" +
+      '<button class="btn teal sm" data-mset="shared" data-mid="' + m.id + '"' + (m.status === "shared" || m.status === "ready" ? " disabled" : "") + ">결과 공개 · 투표</button>" +
+      '<button class="btn ghost sm" data-mset="ready" data-mid="' + m.id + '"' + (m.status === "ready" ? " disabled" : "") + ">숨기기</button>" +
+      '<span class="grow"></span><button class="btn ghost sm" data-medit="' + m.id + '">수정</button>' +
+      (T.confirm === "m" + m.id ? '<button class="btn red sm" data-mdel="' + m.id + '">제출물까지 삭제 확인</button><button class="btn ghost sm" data-mcancel="1">취소</button>'
+        : '<button class="btn ghost sm" data-mdelask="' + m.id + '">삭제</button>') + "</div>";
+    if (subs.length) {
+      h += "<div>";
+      for (const x of subs) {
+        h += '<div class="subrow"><div><b>' + esc(x.name) + '</b><div class="small muted">' + esc(x.student_id) + " · " + fmtTime(x.updated_at) + "</div>" +
+          (m.status === "shared" ? '<div class="pill p-open" style="margin-top:6px">♥ ' + x.votes + "</div>" : "") + "</div>" +
+          "<div>" + (x.body ? '<pre class="subpre">' + esc(x.body) + "</pre>" : '<span class="muted small">(글 없음)</span>') + "</div>" +
+          '<div class="stack" style="gap:6px">' + (x.file_path ? fileView(x) : '<span class="muted small">(파일 없음)</span>') +
+          (T.confirm === "s" + x.id ? '<button class="btn red sm" data-sdel="' + x.id + '">삭제 확인</button>' : '<button class="btn ghost sm" data-sdelask="' + x.id + '">이 제출 삭제</button>') + "</div></div>";
+      }
+      h += "</div>";
+    }
+    h += "</div>";
+  }
+  box.innerHTML = h;
+  document.getElementById("newm").onclick = function () { editMission({ session: T.session, title: "", body: "", allow_text: true, allow_file: true }); };
+  for (const b of box.querySelectorAll("[data-mset]")) {
+    b.onclick = async function () {
+      const r = await rpc("teacher_mission_status", { p_pin: T.pin, p_mid: Number(b.dataset.mid), p_status: b.dataset.mset });
+      if (r.error) toast(r.error);
+      loadTMissions(true);
+    };
+  }
+  for (const b of box.querySelectorAll("[data-medit]")) {
+    b.onclick = function () { editMission(T.mdata.missions.find(function (m) { return m.id === Number(b.dataset.medit); })); };
+  }
+  for (const b of box.querySelectorAll("[data-mdelask]")) b.onclick = function () { T.confirm = "m" + b.dataset.mdelask; renderTMissions(); };
+  for (const b of box.querySelectorAll("[data-sdelask]")) b.onclick = function () { T.confirm = "s" + b.dataset.sdelask; renderTMissions(); };
+  for (const b of box.querySelectorAll("[data-mcancel]")) b.onclick = function () { T.confirm = null; renderTMissions(); };
+  for (const b of box.querySelectorAll("[data-mdel]")) {
+    b.onclick = async function () { T.confirm = null; const r = await rpc("teacher_delete_mission", { p_pin: T.pin, p_mid: Number(b.dataset.mdel) }); if (r.error) toast(r.error); loadTMissions(true); };
+  }
+  for (const b of box.querySelectorAll("[data-sdel]")) {
+    b.onclick = async function () { T.confirm = null; const r = await rpc("teacher_delete_sub", { p_pin: T.pin, p_sub: Number(b.dataset.sdel) }); if (r.error) toast(r.error); loadTMissions(true); };
+  }
+}
+function editMission(m) {
+  const wrap = document.createElement("div");
+  wrap.className = "modal";
+  wrap.innerHTML = '<form class="card stack" id="mf"><h2>' + (m.id ? "미션 수정" : T.session + "차시 새 미션") + "</h2>" +
+    '<div class="field"><label for="mtitle">제목</label><input class="input" id="mtitle" value="' + esc(m.title) + '" placeholder="예: 미니 공모전: 주문서대로 그리기"></div>' +
+    '<div class="field"><label for="mbody">안내 (학생에게 보여요)</label><textarea class="input" id="mbody" placeholder="무엇을 올리면 되는지 써 주세요">' + esc(m.body) + "</textarea></div>" +
+    '<div class="row"><label class="row" style="gap:6px"><input type="checkbox" id="mallowt"' + (m.allow_text ? " checked" : "") + "> 글 받기</label>" +
+    '<label class="row" style="gap:6px"><input type="checkbox" id="mallowf"' + (m.allow_file ? " checked" : "") + "> 파일 받기 (10MB 이하)</label></div>" +
+    '<div class="err" id="merr"></div><div class="row"><button class="btn" type="submit">저장</button><button class="btn ghost" type="button" id="mcancel">취소</button></div></form>';
+  document.body.appendChild(wrap);
+  document.getElementById("mcancel").onclick = function () { wrap.remove(); };
+  document.getElementById("mf").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const at = document.getElementById("mallowt").checked, af = document.getElementById("mallowf").checked;
+    if (!at && !af) { document.getElementById("merr").textContent = "글이나 파일 중 하나는 받아야 해요."; return; }
+    const r = await rpc("teacher_save_mission", { p_pin: T.pin, p_m: { id: m.id || "", session: T.session, title: document.getElementById("mtitle").value.trim(), body: document.getElementById("mbody").value, allow_text: at, allow_file: af } });
+    if (r.error) { document.getElementById("merr").textContent = r.error; return; }
+    wrap.remove(); loadTMissions(true);
   });
 }
 
