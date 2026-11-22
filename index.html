@@ -147,12 +147,42 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 .fname { font-weight: 700; word-break: break-all; }
 .filebtn { position: relative; overflow: hidden; }
 .filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
-.gal { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
-.gitem { border: 1.5px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--card); display: flex; flex-direction: column; }
-.gitem.mine { border-color: var(--orange); }
-.gitem img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--bg); display: block; }
-.gitem .gb { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.gitem pre, .subpre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 14px/1.5 var(--font); max-height: 220px; overflow: auto; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+.subpre { margin: 0; white-space: pre-wrap; word-break: break-word; font: 14px/1.5 var(--font); max-height: 220px; overflow: auto; background: var(--bg); border-radius: 10px; padding: 8px 10px; }
+/* 미션 갤러리 */
+.mgal, .rgal { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .mgal, .rgal { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.mtile, .rtile { border: 0; padding: 0; text-align: left; background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 1px 2px rgba(17,24,39,.06), 0 4px 14px rgba(17,24,39,.05); display: flex; flex-direction: column; color: var(--ink); transition: transform .15s ease; }
+.mtile:active, .rtile:active { transform: scale(.97); }
+.thumb { position: relative; aspect-ratio: 1 / 1; background: var(--bg); overflow: hidden; }
+.mtile .thumb { aspect-ratio: 4 / 3; }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb .ph { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; background: linear-gradient(135deg, var(--navyT), var(--tealT)); color: var(--navy); }
+.thumb .ph b { font-size: 34px; line-height: 1; } .thumb .ph span { font-size: 13px; font-weight: 700; }
+.thumb .tx { position: absolute; inset: 0; padding: 12px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; overflow: hidden; color: var(--ink); background: linear-gradient(180deg, #fff 0%, var(--bg) 100%); -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent); mask-image: linear-gradient(180deg, #000 70%, transparent); }
+.tbadge { position: absolute; top: 8px; left: 8px; background: rgba(255,255,255,.92); color: var(--navy); font-size: 12px; font-weight: 800; border-radius: 999px; padding: 3px 9px; }
+.tbadge.sh { color: var(--teal); }
+.tbadge.aw { left: auto; right: 8px; background: #FEF3C7; color: #92400E; }
+.tbadge.vote-me { top: auto; bottom: 8px; background: var(--orange); color: #fff; }
+.mtile .tb { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mtile .tb b { font-size: 15px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mtile .tm { font-size: 12px; color: var(--sub); }
+.hz { color: var(--red); font-weight: 800; }
+.rtile.mine { box-shadow: 0 0 0 2px var(--orange); }
+.heart { position: absolute; right: 8px; bottom: 8px; background: rgba(17,24,39,.72); color: #fff; font-weight: 800; font-size: 13px; border-radius: 999px; padding: 4px 10px; }
+.heart.on { background: var(--red); }
+.rn { padding: 8px 10px; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.me { display: inline-block; background: var(--orangeT); color: var(--orange); font-size: 11px; font-weight: 800; border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
+.award { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.award .chip { padding: 5px 10px; font-size: 13px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.award .chip[aria-pressed="true"] { background: #F59E0B; color: #fff; box-shadow: none; }
+.p-award { background: #FEF3C7; color: #92400E; }
+.viewer { z-index: 60; }
+.viewer .card { width: min(560px, 100%); }
+.vimg img { width: 100%; max-height: 60vh; object-fit: contain; background: var(--bg); border-radius: 12px; display: block; }
+.vtext { max-height: 40vh; }
+.vote.big { width: 100%; padding: 14px; font-size: 16px; }
+.vote.big:not([disabled]):not([aria-pressed="true"]) { background: var(--red); color: #fff; }
+body.lock { overflow: hidden; }
 .vote { border: 0; border-radius: 10px; padding: 8px 12px; font-weight: 800; background: var(--bg); color: var(--sub); }
 .vote[aria-pressed="true"] { background: var(--redT); color: var(--red); }
 .p-shared { background: var(--tealT); color: var(--teal); }
@@ -304,7 +334,7 @@ function route() {
 // =====================================================================
 //  학생 화면
 // =====================================================================
-const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mopen: null, mdraft: {}, mfile: {}, mbusy: {}, pending: false };
+const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mopen: null, mview: null, mdraft: {}, mfile: {}, mbusy: {}, pending: false };
 
 function studentView() {
   const token = store("quiz_token");
@@ -476,7 +506,7 @@ function renderStudent() {
 
   document.getElementById("logout").onclick = function () { store("quiz_token", null); route(); };
   for (const b of app.querySelectorAll("[data-tab]")) {
-    b.onclick = function () { S.tab = b.dataset.tab; S.past = null; S.mopen = null; S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
+    b.onclick = function () { S.tab = b.dataset.tab; S.past = null; S.mopen = null; S.mview = null; S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
   }
   for (const b of app.querySelectorAll("[data-past]")) {
     b.onclick = function () { S.past = Number(b.dataset.past); S.filter = "all"; renderStudent(); window.scrollTo(0, 0); };
@@ -525,14 +555,11 @@ const MSTATUS = { open: ["제출 중", "p-open"], closed: ["마감", "p-closed"]
 function missionTab() {
   const ms = S.missions.slice().sort(function (a, b) {
     const o = { open: 0, shared: 1, closed: 2 };
-    return (o[a.status] - o[b.status]) || (b.session - a.session) || (a.mno - b.mno);
+    return (o[a.status] - o[b.status]) || (b.session - a.session) || (b.mno - a.mno);
   });
   if (!ms.length) return '<div class="sec-title">미션</div><div class="card empty"><span class="dot"></span><h2 style="margin-top:10px">선생님이 미션을 열면 여기에 나타나요</h2><p class="muted small">글이나 파일(사진 · PDF 등)로 결과를 올려요.</p></div>';
-  if (S.mopen != null && !ms.some(function (m) { return m.id === S.mopen; })) S.mopen = null;
-  if (S.mopen != null) {
-    const m = ms.find(function (x) { return x.id === S.mopen; });
-    return '<div class="row"><button class="back" id="mback">‹ 미션 목록</button></div>' + missionCard(m);
-  }
+  if (S.mopen != null && !ms.some(function (m) { return m.id === S.mopen; })) { S.mopen = null; S.mview = null; }
+  if (S.mopen != null) return missionDetail(ms.find(function (x) { return x.id === S.mopen; }));
   const openM = ms.filter(function (m) { return m.status === "open"; });
   const doneM = ms.filter(function (m) { return m.status !== "open"; });
   let h = "";
@@ -541,15 +568,37 @@ function missionTab() {
     for (const m of openM) h += missionCard(m);
   }
   if (doneM.length) {
-    h += '<div class="sec-title">' + (openM.length ? "지난 미션" : "미션") + '</div><div class="sess-list">';
-    for (const m of doneM) {
-      const n = (m.gallery || []).length;
-      h += '<button class="sess-item" data-mopen="' + m.id + '"><span class="no">' + m.session + '차시</span><span class="meta"><b>' + esc(m.title) + "</b><span>" +
-        (m.status === "shared" ? '<em class="mst">결과 공개 · ' + n + "개" + (m.my_vote ? " · 투표함" : " · 투표하기") + "</em>" : "마감") + " · " + (m.mine ? "제출함" : "제출 안 함") +
-        '</span></span><span class="muted">›</span></button>';
-    }
+    h += '<div class="sec-title">' + (openM.length ? "지난 미션" : "미션") + ' · ' + doneM.length + '개</div><div class="mgal">';
+    for (const m of doneM) h += missionTile(m);
     h += "</div>";
   }
+  return h;
+}
+function imgOf(x) { return x && x.file_path && isImg(x.file_type, x.file_name) ? x : null; }
+function missionCover(m) {
+  if (m.status === "shared") {
+    const g = (m.gallery || []).filter(imgOf).slice().sort(function (a, b) { return b.votes - a.votes; });
+    if (g.length) return g[0];
+  }
+  return imgOf(m.mine);
+}
+function missionTile(m) {
+  const cov = missionCover(m), g = m.gallery || [];
+  const hearts = g.reduce(function (t, x) { return t + (x.votes || 0); }, 0);
+  const award = m.mine && m.mine.award ? m.mine.award : 0;
+  let badge = m.status === "shared" ? '<span class="tbadge sh">결과 공개</span>' : '<span class="tbadge">마감</span>';
+  let h = '<button class="mtile" data-mopen="' + m.id + '"><div class="thumb">' +
+    (cov ? '<img src="' + fileUrl(cov.file_path) + '" alt="" loading="lazy">' : '<div class="ph"><b>' + m.session + '</b><span>차시</span></div>') +
+    badge + (award ? '<span class="tbadge aw">🏅 +' + award + "</span>" : "") +
+    (m.status === "shared" && !m.my_vote && g.some(function (x) { return !x.me; }) ? '<span class="tbadge vote-me">투표하기</span>' : "") +
+    '</div><div class="tb"><span class="q-label">' + m.session + "차시 미션 " + m.mno + "</span><b>" + esc(m.title) + '</b><span class="tm">' +
+    (m.mine ? "제출함" : "제출 안 함") + (m.status === "shared" ? " · 결과 " + g.length + '개 · <span class="hz">♥ ' + hearts + "</span>" : "") + "</span></div></button>";
+  return h;
+}
+function missionDetail(m) {
+  let h = '<div class="row"><button class="back" id="mback">‹ 미션 목록</button></div>' + missionCard(m);
+  if (m.status === "shared") h += resultGrid(m);
+  if (S.mview != null) h += viewer(m);
   return h;
 }
 function missionCard(m) {
@@ -557,12 +606,48 @@ function missionCard(m) {
   let h = '<div class="card stack" id="m-' + m.id + '"><div class="row"><span class="q-label grow">' + m.session + "차시 미션 " + m.mno + '</span><span class="pill ' + st[1] + '">' + st[0] + "</span></div>" +
     "<h2>" + esc(m.title) + "</h2>" + (m.body ? '<div class="m-body">' + esc(m.body) + "</div>" : "");
   if (m.status === "open") h += missionForm(m);
-  else {
-    if (m.mine) h += '<div class="small muted">내 제출 · ' + fmtTime(m.mine.updated_at) + "</div>" + (m.mine.body ? '<pre class="subpre">' + esc(m.mine.body) + "</pre>" : "") + (m.mine.file_path ? '<div class="fbox">' + fileView(m.mine) + "</div>" : "");
-    else h += '<div class="note ex">제출하지 않았어요.</div>';
-    if (m.status === "shared") h += gallery(m);
+  else if (m.mine) {
+    h += '<div class="row"><span class="small muted grow">내 제출 · ' + fmtTime(m.mine.updated_at) + "</span>" +
+      (m.mine.award ? '<span class="pill p-award">🏅 우수 미션 +' + m.mine.award + "점</span>" : "") + "</div>" +
+      (m.mine.body ? '<pre class="subpre">' + esc(m.mine.body) + "</pre>" : "") + (m.mine.file_path ? '<div class="fbox">' + fileView(m.mine) + "</div>" : "");
+  } else h += '<div class="note ex">제출하지 않았어요.</div>';
+  return h + "</div>";
+}
+function resultGrid(m) {
+  const g = m.gallery || [];
+  let h = '<div class="sec-title">모두의 결과 · ' + g.length + "개" + (m.my_vote ? " · 투표 완료" : g.some(function (x) { return !x.me; }) ? " · 눌러서 보고 1표!" : "") + "</div>";
+  if (!g.length) return h + '<div class="card empty muted">아직 올라온 결과가 없어요.</div>';
+  h += '<div class="rgal">';
+  for (const x of g) {
+    const im = imgOf(x), voted = m.my_vote === x.id;
+    h += '<button class="rtile' + (x.me ? " mine" : "") + '" data-mview="' + x.id + '"><div class="thumb">' +
+      (im ? '<img src="' + fileUrl(x.file_path) + '" alt="" loading="lazy">'
+        : '<div class="tx">' + (x.body ? esc(x.body.slice(0, 160)) : x.file_path ? "📎 " + esc(x.file_name || "첨부 파일") : "") + "</div>") +
+      (x.award ? '<span class="tbadge aw">🏅 +' + x.award + "</span>" : "") +
+      '<span class="heart' + (voted ? " on" : "") + '">♥ ' + x.votes + "</span></div>" +
+      '<div class="rn">' + esc(x.name) + (x.me ? ' <span class="me">나</span>' : "") + "</div></button>";
   }
   return h + "</div>";
+}
+function viewer(m) {
+  const g = m.gallery || [];
+  const i = g.findIndex(function (x) { return x.id === S.mview; });
+  if (i < 0) { S.mview = null; return ""; }
+  const x = g[i], im = imgOf(x), voted = m.my_vote === x.id;
+  let h = '<div class="modal viewer" id="mviewer" role="dialog" aria-modal="true" aria-label="' + esc(x.name) + ' 작품"><div class="card stack">' +
+    '<div class="row"><b class="grow">' + esc(x.name) + (x.me ? ' <span class="me">나</span>' : "") + "</b>" +
+    (x.award ? '<span class="pill p-award">🏅 +' + x.award + "점</span>" : "") +
+    '<button class="btn ghost sm" id="mvclose" aria-label="닫기">✕</button></div>';
+  if (im) h += '<a class="vimg" href="' + fileUrl(x.file_path) + '" target="_blank" rel="noopener"><img src="' + fileUrl(x.file_path) + '" alt="' + esc(x.file_name || "작품 그림") + '"></a>';
+  else if (x.file_path) h += fileView(x);
+  if (x.body) h += '<pre class="subpre vtext">' + esc(x.body) + "</pre>";
+  h += '<div class="row vfoot"><button class="btn ghost sm" data-mstep="-1"' + (i === 0 ? " disabled" : "") + '>‹ 이전</button>' +
+    '<span class="grow small muted" style="text-align:center">' + (i + 1) + " / " + g.length + "</span>" +
+    '<button class="btn ghost sm" data-mstep="1"' + (i === g.length - 1 ? " disabled" : "") + ">다음 ›</button></div>" +
+    '<button class="vote big" data-mvote="' + x.id + '" aria-pressed="' + voted + '"' + (x.me ? " disabled" : "") + ">" +
+    (x.me ? "내 작품 · ♥ " + x.votes : voted ? "♥ " + x.votes + " · 내가 투표한 작품" : "♥ " + x.votes + " · 이 작품에 투표") + "</button>" +
+    "</div></div>";
+  return h;
 }
 function missionForm(m) {
   const id = m.id, mine = m.mine;
@@ -582,24 +667,30 @@ function missionForm(m) {
     '<p class="small muted" style="margin:0">마감 전까지는 고쳐서 다시 제출할 수 있어요.</p>';
   return h;
 }
-function gallery(m) {
-  const g = m.gallery || [];
-  if (!g.length) return '<div class="note ex">아직 올라온 결과가 없어요.</div>';
-  let h = '<div class="sec-title" style="margin-top:4px">모두의 결과 · ' + g.length + "개" + (m.my_vote ? "" : " · 마음에 드는 작품에 1표!") + '</div><div class="gal">';
-  for (const x of g) {
-    h += '<div class="gitem' + (x.me ? " mine" : "") + '">' + (x.file_path && isImg(x.file_type, x.file_name) ? fileView(x) : "") +
-      '<div class="gb"><div class="row"><b class="grow">' + esc(x.name) + (x.me ? " (나)" : "") + "</b>" +
-      '<button class="vote" data-mvote="' + x.id + '" aria-pressed="' + (m.my_vote === x.id) + '"' + (x.me ? " disabled" : "") + ">♥ " + x.votes + "</button></div>" +
-      (x.file_path && !isImg(x.file_type, x.file_name) ? fileView(x) : "") + (x.body ? "<pre>" + esc(x.body) + "</pre>" : "") + "</div></div>";
-  }
-  return h + "</div>";
-}
 function bindMissions() {
   for (const b of app.querySelectorAll("[data-mopen]")) {
     b.onclick = function () { S.mopen = Number(b.dataset.mopen); renderStudent(); window.scrollTo(0, 0); };
   }
   const mb = document.getElementById("mback");
-  if (mb) mb.onclick = function () { S.mopen = null; renderStudent(); window.scrollTo(0, 0); };
+  if (mb) mb.onclick = function () { S.mopen = null; S.mview = null; renderStudent(); window.scrollTo(0, 0); };
+  for (const b of app.querySelectorAll("[data-mview]")) {
+    b.onclick = function () { S.mview = Number(b.dataset.mview); renderStudent(); };
+  }
+  const mv = document.getElementById("mviewer");
+  if (mv) {
+    document.body.classList.add("lock");
+    const close = function () { S.mview = null; renderStudent(); };
+    document.getElementById("mvclose").onclick = close;
+    mv.onclick = function (e) { if (e.target === mv) close(); };
+    for (const b of mv.querySelectorAll("[data-mstep]")) {
+      b.onclick = function () {
+        const m = S.missions.find(function (x) { return x.id === S.mopen; });
+        const g = (m && m.gallery) || [];
+        const i = g.findIndex(function (x) { return x.id === S.mview; }) + Number(b.dataset.mstep);
+        if (g[i]) { S.mview = g[i].id; renderStudent(); }
+      };
+    }
+  } else document.body.classList.remove("lock");
   for (const ta of app.querySelectorAll("[data-mtext]")) {
     ta.oninput = function () { S.mdraft[ta.dataset.mtext] = ta.value; };
     ta.onblur = function () { if (S.pending) { S.pending = false; setTimeout(renderStudent, 0); } };
@@ -1038,6 +1129,7 @@ async function loadTMissions(force) {
   T.msig = sig; T.mdata = r;
   renderTMissions();
 }
+const AWARDS = [0, 5, 10, 20];
 function renderTMissions() {
   const box = document.getElementById("tmis");
   if (!box) return;
@@ -1065,7 +1157,11 @@ function renderTMissions() {
       h += "<div>";
       for (const x of subs) {
         h += '<div class="subrow"><div><b>' + esc(x.name) + '</b><div class="small muted">' + esc(x.student_id) + " · " + fmtTime(x.updated_at) + "</div>" +
-          (m.status === "shared" ? '<div class="pill p-open" style="margin-top:6px">♥ ' + x.votes + "</div>" : "") + "</div>" +
+          (m.status === "shared" ? '<div class="pill p-open" style="margin-top:6px">♥ ' + x.votes + "</div>" : "") +
+          (x.award ? '<div class="pill p-award" style="margin-top:6px">🏅 +' + x.award + "점</div>" : "") +
+          '<div class="award"><span class="small muted">우수 포인트</span>' + AWARDS.map(function (v) {
+            return '<button class="chip" data-award="' + v + '" data-sub="' + x.id + '" aria-pressed="' + ((x.award || 0) === v) + '">' + (v ? "+" + v : "없음") + "</button>";
+          }).join("") + "</div></div>" +
           "<div>" + (x.body ? '<pre class="subpre">' + esc(x.body) + "</pre>" : '<span class="muted small">(글 없음)</span>') + "</div>" +
           '<div class="stack" style="gap:6px">' + (x.file_path ? fileView(x) : '<span class="muted small">(파일 없음)</span>') +
           (T.confirm === "s" + x.id ? '<button class="btn red sm" data-sdel="' + x.id + '">삭제 확인</button>' : '<button class="btn ghost sm" data-sdelask="' + x.id + '">이 제출 삭제</button>') + "</div></div>";
@@ -1085,6 +1181,15 @@ function renderTMissions() {
   }
   for (const b of box.querySelectorAll("[data-medit]")) {
     b.onclick = function () { editMission(T.mdata.missions.find(function (m) { return m.id === Number(b.dataset.medit); })); };
+  }
+  for (const b of box.querySelectorAll("[data-award]")) {
+    b.onclick = async function () {
+      b.disabled = true;
+      const v = Number(b.dataset.award);
+      const r = await rpc("teacher_mission_award", { p_pin: T.pin, p_sub: Number(b.dataset.sub), p_points: v });
+      if (r.error) toast(r.error); else toast(v ? "+" + v + "점을 줬어요 · 순위에 바로 반영돼요" : "포인트를 뺐어요");
+      loadTMissions(true);
+    };
   }
   for (const b of box.querySelectorAll("[data-mdelask]")) b.onclick = function () { T.confirm = "m" + b.dataset.mdelask; renderTMissions(); };
   for (const b of box.querySelectorAll("[data-sdelask]")) b.onclick = function () { T.confirm = "s" + b.dataset.sdelask; renderTMissions(); };
