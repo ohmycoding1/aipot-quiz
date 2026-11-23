@@ -175,6 +175,21 @@ textarea.input { min-height: 140px; resize: vertical; line-height: 1.5; }
 .award { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
 .award .chip { padding: 5px 10px; font-size: 13px; box-shadow: inset 0 0 0 1.5px var(--line); }
 .award .chip[aria-pressed="true"] { background: #F59E0B; color: #fff; box-shadow: none; }
+.mats { padding: 6px 16px; }
+.mat { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.mat:last-child { border-bottom: 0; }
+.mat.hid { opacity: .55; }
+.fk { flex: none; width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+.k-pdf { background: #FEE2E2; color: #B91C1C; } .k-ppt { background: #FFEDD5; color: #C2410C; } .k-doc { background: #DBEAFE; color: #1D4ED8; }
+.k-xls { background: #DCFCE7; color: #15803D; } .k-img { background: var(--tealT); color: var(--teal); } .k-zip { background: #E5E7EB; color: #374151; }
+.k-code { background: #EDE9FE; color: #6D28D9; } .k-etc { background: var(--navyT); color: var(--navy); }
+.mi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mi b { font-size: 15px; word-break: break-word; }
+.mn { font-size: 13px; color: var(--ink); white-space: pre-wrap; }
+.ms { font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl { flex: none; }
+a.btn { text-decoration: none; }
+.mat .acts { flex: none; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .p-award { background: #FEF3C7; color: #92400E; }
 .viewer { z-index: 60; }
 .viewer .card { width: min(560px, 100%); }
@@ -334,7 +349,7 @@ function route() {
 // =====================================================================
 //  학생 화면
 // =====================================================================
-const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mopen: null, mview: null, mdraft: {}, mfile: {}, mbusy: {}, pending: false };
+const S = { tab: "live", past: null, filter: "all", jump: false, data: null, sig: "", pick: {}, draft: {}, busy: {}, missions: [], mats: [], mopen: null, mview: null, mdraft: {}, mfile: {}, mbusy: {}, pending: false };
 
 function studentView() {
   const token = store("quiz_token");
@@ -379,14 +394,15 @@ function studentLogin(msg) {
 }
 
 async function loadStudent(force) {
-  const both = await Promise.all([rpc("student_state", { p_token: S.token }), rpc("student_missions", { p_token: S.token })]);
-  const r = both[0], mr = both[1];
+  const both = await Promise.all([rpc("student_state", { p_token: S.token }), rpc("student_missions", { p_token: S.token }), rpc("student_materials", { p_token: S.token })]);
+  const r = both[0], mr = both[1], tr = both[2];
   if (r.error === "LOGIN") { store("quiz_token", null); return studentLogin("다시 로그인해 주세요."); }
   if (r.error) { if (force) app.innerHTML = '<div class="wrap"><div class="card err">' + esc(r.error) + "</div></div>"; return; }
   const ms = mr && !mr.error && mr.missions ? mr.missions : [];
-  const sig = JSON.stringify(r) + JSON.stringify(ms);
+  const mats = tr && !tr.error && tr.materials ? tr.materials : [];
+  const sig = JSON.stringify(r) + JSON.stringify(ms) + JSON.stringify(mats);
   if (!force && sig === S.sig) return;
-  S.sig = sig; S.data = r; S.missions = ms;
+  S.sig = sig; S.data = r; S.missions = ms; S.mats = mats;
   // 미션 글을 쓰는 중이면 화면을 다시 그리지 않고 기다림
   const ae = document.activeElement;
   if (!force && ae && ae.dataset && ae.dataset.mtext) { S.pending = true; return; }
@@ -394,6 +410,7 @@ async function loadStudent(force) {
 }
 
 const ICON = {
+  mats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M12 12v6"/><path d="M9 15l3 3 3-3"/></svg>',
   live: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>',
   past: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>',
   mission: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>',
@@ -488,6 +505,8 @@ function renderStudent() {
     }
   } else if (S.tab === "mission") {
     html += missionTab();
+  } else if (S.tab === "mats") {
+    html += matsTab();
   } else {
     html += '<div class="card score"><div><b>' + sc.points + '</b><span>내 점수</span></div><div><b>' + sc.correct + '</b><span>맞힌 문제</span></div>' +
       "<div><b>" + (sc.rank ? sc.rank + '<small style="font-size:15px">/' + sc.total + "</small>" : "-") + "</b><span>내 순위</span></div></div>" +
@@ -495,7 +514,10 @@ function renderStudent() {
       '<p class="muted small" style="text-align:center">상위 5명만 공개돼요. 이름 가운데는 * 로 가려져요.</p>';
   }
   html += "</div>";
-  const tabs = [["live", "진행 중", todoList.length], ["mission", "미션", todoM], ["past", "지난 시험", 0], ["rank", "순위", 0]];
+  const seen = Number(store("quiz_mat_seen") || 0);
+  const newMats = S.tab === "mats" ? 0 : S.mats.filter(function (x) { return x.id > seen; }).length;
+  if (S.tab === "mats" && S.mats.length) store("quiz_mat_seen", String(Math.max.apply(null, S.mats.map(function (x) { return x.id; }))));
+  const tabs = [["live", "진행 중", todoList.length], ["mission", "미션", todoM], ["mats", "자료", newMats], ["past", "지난 시험", 0], ["rank", "순위", 0]];
   html += '<nav class="bnav" role="tablist">' + tabs.map(function (t) {
     return '<button role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + ICON[t[0]] + "<span>" + t[1] + "</span>" +
       (t[2] ? '<span class="badge">' + t[2] + "</span>" : "") + "</button>";
@@ -552,6 +574,42 @@ function fileView(f, big) {
 }
 function fmtTime(t) { try { const d = new Date(t); return (d.getMonth() + 1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); } catch (e) { return ""; } }
 const MSTATUS = { open: ["제출 중", "p-open"], closed: ["마감", "p-closed"], shared: ["결과 공개 · 투표", "p-shared"] };
+function storeUrl(bucket, path, dl) {
+  return CFG.SUPABASE_URL + "/storage/v1/object/public/" + bucket + "/" + path.split("/").map(encodeURIComponent).join("/") + (dl ? "?download=" + encodeURIComponent(dl) : "");
+}
+function fmtSize(n) { if (!n) return ""; if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + "KB"; return (n / 1024 / 1024).toFixed(n < 10 * 1024 * 1024 ? 1 : 0) + "MB"; }
+function fileKind(name) {
+  const e = ((/\.([A-Za-z0-9]+)$/.exec(name || "") || [])[1] || "").toLowerCase();
+  if (e === "pdf") return ["PDF", "k-pdf"];
+  if (/^pptx?$|^key$/.test(e)) return ["PPT", "k-ppt"];
+  if (/^docx?$|^hwpx?$|^txt$|^md$/.test(e)) return [e === "txt" || e === "md" ? "TXT" : e.indexOf("hwp") === 0 ? "HWP" : "DOC", "k-doc"];
+  if (/^xlsx?$|^csv$/.test(e)) return [e === "csv" ? "CSV" : "XLS", "k-xls"];
+  if (/^(png|jpe?g|gif|webp|svg)$/.test(e)) return ["IMG", "k-img"];
+  if (/^(zip|7z|rar)$/.test(e)) return ["ZIP", "k-zip"];
+  if (/^(py|ipynb|js|html|json)$/.test(e)) return [e.toUpperCase().slice(0, 4), "k-code"];
+  return [(e || "FILE").toUpperCase().slice(0, 4), "k-etc"];
+}
+function matRow(x, teacher) {
+  const k = fileKind(x.file_name);
+  return '<div class="mat' + (x.visible === false ? " hid" : "") + '"><span class="fk ' + k[1] + '">' + k[0] + "</span>" +
+    '<div class="mi"><b>' + esc(x.title || x.file_name) + "</b>" + (x.note ? '<span class="mn">' + esc(x.note) + "</span>" : "") +
+    '<span class="ms">' + esc(x.file_name || "") + (x.file_size ? " · " + fmtSize(x.file_size) : "") + (x.created_at ? " · " + fmtTime(x.created_at) : "") + "</span></div>" +
+    (teacher ? "" : '<a class="btn sm dl" href="' + storeUrl("materials", x.file_path, x.file_name || "file") + '" target="_blank" rel="noopener">받기</a>') + "</div>";
+}
+function matsTab() {
+  const list = S.mats.slice().sort(function (a, b) { return (b.session - a.session) || (b.id - a.id); });
+  if (!list.length) return '<div class="sec-title">수업 자료</div><div class="card empty"><span class="dot"></span><h2 style="margin-top:10px">선생님이 자료를 올리면 여기에 나타나요</h2><p class="muted small">PDF · PPT · 예제 파일 등을 받을 수 있어요.</p></div>';
+  let h = "", cur = null;
+  for (const x of list) {
+    if (x.session !== cur) {
+      if (cur !== null) h += "</div>";
+      cur = x.session;
+      h += '<div class="sec-title">' + (cur ? cur + "차시 자료" : "공통 자료") + '</div><div class="card mats">';
+    }
+    h += matRow(x, false);
+  }
+  return h + '</div><p class="muted small" style="text-align:center">받기를 누르면 파일이 내려받아져요. 열리기만 하면 길게 눌러 저장하세요.</p>';
+}
 function missionTab() {
   const ms = S.missions.slice().sort(function (a, b) {
     const o = { open: 0, shared: 1, closed: 2 };
@@ -917,6 +975,7 @@ function renderTeacher() {
   }
   h += '</div><div class="tabs" role="tablist"><button role="tab" data-ttab="run" aria-selected="' + (T.tab === "run") + '">문제 운영</button>' +
     '<button role="tab" data-ttab="mission" aria-selected="' + (T.tab === "mission") + '">미션</button>' +
+    '<button role="tab" data-ttab="mats" aria-selected="' + (T.tab === "mats") + '">자료</button>' +
     '<button role="tab" data-ttab="students" aria-selected="' + (T.tab === "students") + '">점수 · 학생</button></div>';
 
   if (T.tab === "run") {
@@ -939,6 +998,8 @@ function renderTeacher() {
     for (const q of qs) h += teacherCard(q, d.students);
   } else if (T.tab === "mission") {
     h += '<div class="stack" id="tmis"><div class="card muted">불러오는 중…</div></div>';
+  } else if (T.tab === "mats") {
+    h += '<div class="stack" id="tmats"><div class="card muted">불러오는 중…</div></div>';
   } else {
     h += '<div class="card" id="studs"><div class="muted">불러오는 중…</div></div>';
   }
@@ -953,6 +1014,7 @@ function renderTeacher() {
   }
   if (T.tab === "students") return loadStudents();
   if (T.tab === "mission") return loadTMissions(true);
+  if (T.tab === "mats") return loadTMats();
   document.getElementById("newq").onclick = function () {
     const next = T.data.questions.reduce(function (m, q) { return Math.max(m, q.qno); }, 0) + 1;
     editQuestion({ session: T.session, qno: next, label: "", kind: "mc", body: "", choices: ["", "", "", ""], answer: [], explanation: "", points: 10 });
@@ -1128,6 +1190,90 @@ async function loadTMissions(force) {
   if (!force && document.querySelector(".modal")) return;
   T.msig = sig; T.mdata = r;
   renderTMissions();
+}
+const MAT_MAX = 50 * 1024 * 1024;
+async function loadTMats() {
+  const r = await rpc("teacher_materials", { p_pin: T.pin });
+  const box = document.getElementById("tmats");
+  if (!box) return;
+  if (r.error) { box.innerHTML = '<div class="card err">' + esc(r.error) + "</div>"; return; }
+  T.mats = r.materials || [];
+  renderTMats();
+}
+function renderTMats() {
+  const box = document.getElementById("tmats");
+  if (!box) return;
+  const list = T.mats.slice().sort(function (a, b) { return (b.session - a.session) || (b.id - a.id); });
+  let opts = '<option value="0">공통 (차시 없음)</option>';
+  for (let i = 1; i <= SESSIONS; i++) opts += '<option value="' + i + '"' + (i === T.session ? " selected" : "") + ">" + i + "차시</option>";
+  let h = '<div class="card stack"><h2>자료 올리기</h2>' +
+    '<div class="row" style="align-items:flex-end"><div class="field" style="flex:0 0 150px"><label for="mt-s">차시</label><select class="input" id="mt-s">' + opts + "</select></div>" +
+    '<div class="field grow"><label for="mt-t">제목 (비우면 파일 이름)</label><input class="input" id="mt-t" placeholder="예: 4차시 실습 예제"></div></div>' +
+    '<div class="field"><label for="mt-n">설명 (선택)</label><input class="input" id="mt-n" placeholder="예: 압축을 풀고 main.py를 여세요"></div>' +
+    '<div class="row"><label class="btn orange filebtn">' + (T.matBusy ? "올리는 중… " + T.matBusy : "파일 선택해서 올리기") +
+    '<input type="file" id="mt-f" multiple' + (T.matBusy ? " disabled" : "") + '></label>' +
+    '<label class="row small" style="gap:6px"><input type="checkbox" id="mt-v" checked> 바로 학생에게 보이기</label>' +
+    '<span class="small muted grow">여러 파일을 한 번에 고를 수 있어요 · 파일당 50MB 이하</span></div></div>';
+  h += '<div class="card"><div class="row" style="margin-bottom:4px"><h2 class="grow">올린 자료 ' + list.length + "개</h2></div>";
+  if (!list.length) h += '<div class="muted">아직 올린 자료가 없어요.</div>';
+  let cur = null;
+  for (const x of list) {
+    if (x.session !== cur) { cur = x.session; h += '<div class="q-label" style="margin-top:12px">' + (cur ? cur + "차시" : "공통") + "</div>"; }
+    h += matRow(x, true).replace(/<\/div>$/, "") +
+      '<div class="acts">' + (x.visible === false ? '<span class="pill p-ready">숨김</span>' : "") +
+      '<a class="btn ghost sm" href="' + storeUrl("materials", x.file_path) + '" target="_blank" rel="noopener">열기</a>' +
+      '<button class="btn ghost sm" data-matvis="' + x.id + '">' + (x.visible === false ? "보이기" : "숨기기") + "</button>" +
+      (T.confirm === "t" + x.id ? '<button class="btn red sm" data-matdel="' + x.id + '">삭제 확인</button><button class="btn ghost sm" data-matcancel="1">취소</button>'
+        : '<button class="btn ghost sm" data-matdelask="' + x.id + '">삭제</button>') + "</div></div>";
+  }
+  box.innerHTML = h + "</div>";
+  const fi = document.getElementById("mt-f");
+  fi.onchange = function () { if (fi.files && fi.files.length) uploadMats(Array.prototype.slice.call(fi.files)); };
+  for (const b of box.querySelectorAll("[data-matvis]")) {
+    b.onclick = async function () {
+      const x = T.mats.find(function (m) { return m.id === Number(b.dataset.matvis); });
+      const r = await rpc("teacher_save_material", { p_pin: T.pin, p_m: { id: x.id, session: x.session, title: x.title, note: x.note || "", visible: x.visible === false } });
+      if (r.error) toast(r.error);
+      loadTMats();
+    };
+  }
+  for (const b of box.querySelectorAll("[data-matdelask]")) b.onclick = function () { T.confirm = "t" + b.dataset.matdelask; renderTMats(); };
+  for (const b of box.querySelectorAll("[data-matcancel]")) b.onclick = function () { T.confirm = null; renderTMats(); };
+  for (const b of box.querySelectorAll("[data-matdel]")) {
+    b.onclick = async function () {
+      T.confirm = null;
+      const r = await rpc("teacher_delete_material", { p_pin: T.pin, p_id: Number(b.dataset.matdel) });
+      if (r.error) toast(r.error); else toast("자료를 지웠어요");
+      loadTMats();
+    };
+  }
+}
+async function uploadMats(files) {
+  const sess = Number(document.getElementById("mt-s").value);
+  const title = document.getElementById("mt-t").value.trim();
+  const note = document.getElementById("mt-n").value.trim();
+  const vis = document.getElementById("mt-v").checked;
+  let ok = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    if (f.size > MAT_MAX) { toast(f.name + ": 50MB 이하 파일만 올릴 수 있어요"); continue; }
+    T.matBusy = (i + 1) + "/" + files.length; renderTMats();
+    const t = await rpc("teacher_material_ticket", { p_pin: T.pin });
+    if (t.error) { toast(t.error); break; }
+    const m = /\.[A-Za-z0-9]{1,8}$/.exec(f.name);
+    const path = t.ticket + "/" + Date.now() + "-" + i + (m ? m[0].toLowerCase() : "");
+    const up = await sb.storage.from("materials").upload(path, f, { contentType: f.type || "application/octet-stream", upsert: false });
+    if (up.error) { toast("업로드 실패: " + up.error.message); continue; }
+    const r = await rpc("teacher_save_material", { p_pin: T.pin, p_m: {
+      id: "", session: sess, title: files.length === 1 && title ? title : f.name.replace(/\.[^.]+$/, ""), note: note, visible: vis,
+      file_path: path, file_name: f.name, file_type: f.type || "", file_size: f.size } });
+    if (r.error) { toast(r.error); continue; }
+    ok++;
+  }
+  T.matBusy = null;
+  if (ok) toast("자료 " + ok + "개를 올렸어요");
+  await loadTMats();
+  const tt = document.getElementById("mt-t"); if (tt && ok) tt.value = "";
 }
 const AWARDS = [0, 5, 10, 20];
 function renderTMissions() {
